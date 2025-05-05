@@ -65,6 +65,8 @@ let selectedItemId = null;
 let selectedItemType = null;
 let currentViewState = { id: null, type: null, parentId: null, parentType: null };
 let currentTransform = d3.zoomIdentity;
+let zoomObj = null;
+let svgObj = null;
 
 // ========== INITIALIZATION ==========
 
@@ -193,15 +195,7 @@ function drillUp() {
         if (selectedElement) selectedElement.classList.add('active');
         currentViewState = { id: currentViewState.parentId, type: currentViewState.parentType, parentId: null, parentType: null };
     } else {
-        updateVisualization(null, null);
-        selectedItemId = null;
-        selectedItemType = null;
-        document.querySelectorAll('.item').forEach(item => item.classList.remove('active'));
-        currentViewState = { id: null, type: null, parentId: null, parentType: null };
-        const detailBox = document.getElementById('detail-box');
-        if (detailBox) detailBox.style.display = 'none';
-        const drillUpBtn = document.getElementById('drill-up-btn');
-        if (drillUpBtn) drillUpBtn.style.display = 'none';
+        resetVisualization();
     }
 }
 function addDetailBox() {
@@ -218,39 +212,56 @@ function showDetailBox(itemId, itemType) {
 
 // ========== VISUALIZATION ==========
 
-function initializeVisualization() { updateVisualization(null, null); }
+function initializeVisualization() { resetVisualization(); }
 
-function updateVisualization(id, type) {
+function resetVisualization() {
+    // Always show "All Process" (rank 0) as root
+    selectedItemId = null;
+    selectedItemType = null;
+    currentViewState = { id: null, type: null, parentId: null, parentType: null };
+    document.querySelectorAll('.item').forEach(item => item.classList.remove('active'));
+    updateVisualization(null, null, true);
+    const detailBox = document.getElementById('detail-box');
+    if (detailBox) detailBox.style.display = 'none';
+    const drillUpBtn = document.getElementById('drill-up-btn');
+    if (drillUpBtn) drillUpBtn.style.display = 'none';
+}
+
+function updateVisualization(id, type, resetZoom = false) {
     const visualizationElement = document.getElementById('visualization');
     if (!visualizationElement) return;
     visualizationElement.innerHTML = '';
     const width = visualizationElement.clientWidth || 800;
     const height = visualizationElement.clientHeight || 600;
-    const svg = d3.select('#visualization')
+    svgObj = d3.select('#visualization')
         .append('svg')
         .attr('width', width)
         .attr('height', height)
         .style('border', '1px solid #eee');
-    const g = svg.append('g');
-    const zoom = d3.zoom()
+    const g = svgObj.append('g');
+    zoomObj = d3.zoom()
         .extent([[0, 0], [width, height]])
         .scaleExtent([0.1, 8])
         .on("zoom", (event) => {
             g.attr("transform", event.transform);
             currentTransform = event.transform;
         });
-    svg.call(zoom);
+    svgObj.call(zoomObj);
     addZoomButtons();
-    setupZoomButtons(svg, zoom);
+    setupZoomButtons(svgObj, zoomObj);
     createHierarchyLayout(g, id, type, width, height);
     setupToggleVisibility();
+    if (resetZoom) {
+        currentTransform = d3.zoomIdentity;
+        svgObj.transition().duration(500).call(zoomObj.transform, currentTransform);
+    }
 }
 
 function createHierarchyLayout(g, focusId, focusType, width, height) {
-    // --- Build nodes and links ---
     let nodes = [], links = [];
-    if (focusId === null || focusType === null)
-        nodes.push({ id: 'all', name: 'All Process', type: 'all-process', level: 0 });
+    if (focusId === null || focusType === null) {
+        nodes.push({ id: 'all', name: 'All Process', type: 'all-process', level: 0, x: width / 2, y: 50 });
+    }
     let processesToInclude = [];
     if (focusId === null || focusType === null) {
         processesToInclude = data.processes;
@@ -270,7 +281,7 @@ function createHierarchyLayout(g, focusId, focusType, width, height) {
             )
         );
     }
-    processesToInclude.forEach(process => {
+    processesToInclude.forEach((process, i) => {
         nodes.push({ id: process.id, name: process.name, type: 'process', level: 1 });
         if ((focusId === null || focusType === null || focusId === 'all') && nodes.find(n => n.id === 'all')) {
             links.push({ source: 'all', target: process.id });
@@ -297,7 +308,7 @@ function createHierarchyLayout(g, focusId, focusType, width, height) {
         }
     });
 
-    // --- Fixed positioning by type ---
+    // Fixed positioning by type
     const processNodes = nodes.filter(n => n.type === 'process');
     const subProcessNodes = nodes.filter(n => n.type === 'sub-process');
     const systemNodes = nodes.filter(n => n.type === 'system');
@@ -313,11 +324,12 @@ function createHierarchyLayout(g, focusId, focusType, width, height) {
     const vendorSpacing = 110, totalVenWidth = (vendorNodes.length - 1) * vendorSpacing, venStartX = (width - totalVenWidth) / 2;
     vendorNodes.forEach((node, i) => { node.fx = venStartX + i * vendorSpacing; node.fy = 450; });
 
-    // --- D3 simulation and rendering ---
     const simulation = d3.forceSimulation(nodes)
         .force("link", d3.forceLink(links).id(d => d.id).distance(100))
         .force("charge", d3.forceManyBody().strength(-30))
-        .force("collide", d3.forceCollide().radius(60));
+        .force("collide", d3.forceCollide().radius(60))
+        .force("center", d3.forceCenter(width / 2, height / 2)); // Center simulation
+
     const link = g.selectAll(".link")
         .data(links)
         .enter()
@@ -429,8 +441,7 @@ function setupZoomButtons(svg, zoom) {
     }
     if (resetBtn) {
         resetBtn.onclick = () => {
-            currentTransform = d3.zoomIdentity;
-            svg.transition().duration(500).call(zoom.transform, currentTransform);
+            resetVisualization();
         };
     }
 }
@@ -470,7 +481,6 @@ function handleNodeClick(event, d) {
     if (d.type !== 'all-process') {
         showPopupForNode(d, event);
     }
-    // (Selection logic omitted for brevity; see previous code)
     updateVisualization(d.id, d.type);
     const drillUpBtn = document.getElementById('drill-up-btn');
     if (drillUpBtn) {
@@ -478,7 +488,6 @@ function handleNodeClick(event, d) {
     }
 }
 function showPopupForNode(d, event) {
-    // Remove any existing popup
     d3.select('#node-popup').remove();
     const popup = d3.select('body')
         .append('div')
