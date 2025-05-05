@@ -36,6 +36,74 @@ let currentViewState = {
     parentType: null
 };
 
+// Variables to hold current zoom transform
+let currentTransform = d3.zoomIdentity;
+
+// Add zoom control buttons to the header
+function addZoomButtons() {
+    const header = document.querySelector('header');
+    if (!header) return;
+
+    // Remove existing buttons if they exist
+    const existingZoomIn = document.getElementById('zoom-in-btn');
+    const existingZoomOut = document.getElementById('zoom-out-btn');
+    const existingReset = document.getElementById('reset-btn');
+    
+    if (existingZoomIn) existingZoomIn.remove();
+    if (existingZoomOut) existingZoomOut.remove();
+    if (existingReset) existingReset.remove();
+
+    const zoomInBtn = document.createElement('button');
+    zoomInBtn.id = 'zoom-in-btn';
+    zoomInBtn.className = 'control-btn';
+    zoomInBtn.textContent = '+';
+    zoomInBtn.title = 'Zoom In';
+
+    const zoomOutBtn = document.createElement('button');
+    zoomOutBtn.id = 'zoom-out-btn';
+    zoomOutBtn.className = 'control-btn';
+    zoomOutBtn.textContent = '-';
+    zoomOutBtn.title = 'Zoom Out';
+
+    const resetBtn = document.createElement('button');
+    resetBtn.id = 'reset-btn';
+    resetBtn.className = 'control-btn';
+    resetBtn.textContent = 'Reset';
+    resetBtn.title = 'Reset View';
+
+    header.appendChild(zoomInBtn);
+    header.appendChild(zoomOutBtn);
+    header.appendChild(resetBtn);
+}
+
+// Setup zoom button event listeners
+function setupZoomButtons(svg, zoom) {
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
+    const resetBtn = document.getElementById('reset-btn');
+
+    if (zoomInBtn) {
+        zoomInBtn.addEventListener('click', () => {
+            currentTransform = currentTransform.scale(1.2);
+            svg.transition().duration(500).call(zoom.transform, currentTransform);
+        });
+    }
+
+    if (zoomOutBtn) {
+        zoomOutBtn.addEventListener('click', () => {
+            currentTransform = currentTransform.scale(0.8);
+            svg.transition().duration(500).call(zoom.transform, currentTransform);
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            currentTransform = d3.zoomIdentity;
+            svg.transition().duration(500).call(zoom.transform, currentTransform);
+        });
+    }
+}
+
 // Initialize the application when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM fully loaded");
@@ -545,14 +613,19 @@ function updateVisualization(id, type) {
     // Create a group for zoom/pan
     const g = svg.append('g');
     
-    // Add zoom behavior
-    svg.call(d3.zoom()
+    // Add zoom behavior with controls
+    const zoom = d3.zoom()
         .extent([[0, 0], [width, height]])
         .scaleExtent([0.1, 8])
         .on("zoom", (event) => {
             g.attr("transform", event.transform);
-        })
-    );
+            currentTransform = event.transform;
+        });
+
+    svg.call(zoom);
+
+    addZoomButtons();
+    setupZoomButtons(svg, zoom);
     
     // Create hierarchical layout
     createForceDirectedLayout(g, id, type, width, height);
@@ -684,21 +757,31 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
         allProcessNode.fy = 50;
     }
     
-    // Position processes evenly in a row (rank 1)
+    // Position processes evenly in a row (rank 1) with fixed space
+    const processSpacing = 200; // fixed space between processes
+    const totalProcessWidth = (processNodes.length - 1) * processSpacing;
+    const startX = (width - totalProcessWidth) / 2;
+
     processNodes.forEach((node, index) => {
-        node.fx = width * (index + 1) / (processNodes.length + 1);
+        node.fx = startX + index * processSpacing;
         node.fy = 150; // Fixed Y for processes
     });
     
     // Position systems evenly in a row (rank 2)
+    const systemSpacing = Math.min(180, width / (systemNodes.length + 1));
+    const systemStartX = (width - (systemNodes.length - 1) * systemSpacing) / 2;
+    
     systemNodes.forEach((node, index) => {
-        node.fx = width * (index + 1) / (systemNodes.length + 1);
+        node.fx = systemStartX + index * systemSpacing;
         node.fy = 300; // Fixed Y for systems
     });
     
     // Position vendors evenly in a row (rank 3)
+    const vendorSpacing = Math.min(150, width / (vendorNodes.length + 1));
+    const vendorStartX = (width - (vendorNodes.length - 1) * vendorSpacing) / 2;
+    
     vendorNodes.forEach((node, index) => {
-        node.fx = width * (index + 1) / (vendorNodes.length + 1);
+        node.fx = vendorStartX + index * vendorSpacing;
         node.fy = 450; // Fixed Y for vendors
     });
     
