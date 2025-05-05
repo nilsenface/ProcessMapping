@@ -5,38 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Process Visualization</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Load D3.js from CDN -->
+    <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
     <header>
         <h1>Business Process Visualization</h1>
-        <button id="admin-toggle" class="control-btn">Admin Mode</button>
     </header>
     <main>
         <div class="container">
             <aside class="sidebar">
                 <div class="section-header">
                     <h2>Business Processes</h2>
-                    <button id="add-process" class="add-btn" style="display:none;">+</button>
                 </div>
                 <div id="process-list" class="item-list"></div>
-
                 <div class="section-header">
                     <h2>Systems</h2>
-                    <button id="add-system" class="add-btn" style="display:none;">+</button>
                 </div>
                 <div id="system-list" class="item-list"></div>
-
                 <div class="section-header">
                     <h2>Vendors</h2>
-                    <button id="add-vendor" class="add-btn" style="display:none;">+</button>
                 </div>
                 <div id="vendor-list" class="item-list"></div>
             </aside>
             <section class="visualization-container">
                 <div id="visualization"></div>
             </section>
+            <aside class="right-menu">
+                <button id="admin-toggle" class="control-btn">Admin Mode</button>
+                <button id="zoom-in-btn" class="control-btn">+</button>
+                <button id="zoom-out-btn" class="control-btn">-</button>
+                <button id="reset-btn" class="control-btn">Reset</button>
+                <div class="toggle-group">
+                    <label><input type="checkbox" id="toggle-systems" checked> Show Systems</label>
+                    <label><input type="checkbox" id="toggle-vendors" checked> Show Vendors</label>
+                </div>
+            </aside>
         </div>
     </main>
     <!-- Modal for add/edit -->
@@ -66,7 +70,6 @@
             </form>
         </div>
     </div>
-    <!-- Load app.js after DOM is ready -->
     <script src="app.js"></script>
 </body>
 </html>
