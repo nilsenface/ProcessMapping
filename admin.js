@@ -124,9 +124,9 @@ function setupAdminControls() {
     addBtns.forEach(btn => btn.style.display = adminMode ? 'inline' : 'none');
     renderElements();
   };
-  addBtns[0].onclick = () => openAddModal('process');
-  addBtns[1].onclick = () => openAddModal('system');
-  addBtns[2].onclick = () => openAddModal('provider');
+  addBtns.onclick = () => openAddModal('process');
+  addBtns.onclick = () => openAddModal('system');
+  addBtns.onclick = () => openAddModal('provider');
 }
 
 function setupModal() {
