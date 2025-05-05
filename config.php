@@ -1,4 +1,5 @@
 <?php
+//
 // MongoDB connection configuration
 require_once __DIR__ . '/vendor/autoload.php'; // Include Composer autoloader
 
