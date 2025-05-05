@@ -1,5 +1,8 @@
 <?php require_once 'includes/header.php'; ?>
-
+/**
+ * Get all data from the database..
+ * @return array The complete data structure
+ */
 <div class="container">
     <aside class="sidebar">
         <div class="section-header">
