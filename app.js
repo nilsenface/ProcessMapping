@@ -997,4 +997,507 @@ function addDetailBox() {
 
 // Show detail box for a process, system, or vendor
 function showDetailBox(itemId, itemType) {
-    const detailBox = document.
+    const detailBox = document.getElementById('detail-box');
+    if (!detailBox) return;
+    
+    let html = '';
+    
+    if (itemType === 'process') {
+        const process = bpm.getProcess(itemId);
+        if (!process) return;
+        
+        html += `<h3>Process: ${process.name}</h3>`;
+        
+        // Get systems for this process
+        const systems = bpm.getSystemsForProcess(itemId);
+        html += '<div class="detail-section"><strong>Systems:</strong>';
+        if (systems.length > 0) {
+            html += '<ul>';
+            systems.forEach(system => {
+                html += `<li>${system.name}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No systems linked to this process.</p>';
+        }
+        html += '</div>';
+        
+        // Get vendors for this process
+        const vendors = bpm.getVendorsForProcess(itemId);
+        html += '<div class="detail-section"><strong>Vendors:</strong>';
+        if (vendors.length > 0) {
+            html += '<ul>';
+            vendors.forEach(vendor => {
+                html += `<li>${vendor.name}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No vendors linked to this process.</p>';
+        }
+        html += '</div>';
+    } 
+    else if (itemType === 'system') {
+        const system = bpm.getSystem(itemId);
+        if (!system) return;
+        
+        html += `<h3>System: ${system.name}</h3>`;
+        
+        // Get processes for this system
+        const processes = bpm.getProcessesForSystem(itemId);
+        html += '<div class="detail-section"><strong>Processes:</strong>';
+        if (processes.length > 0) {
+            html += '<ul>';
+            processes.forEach(process => {
+                html += `<li>${process.name}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No processes linked to this system.</p>';
+        }
+        html += '</div>';
+        
+        // Get vendors related to this system
+        const vendors = bpm.getVendorsForSystem(itemId);
+        html += '<div class="detail-section"><strong>Related Vendors:</strong>';
+        if (vendors.length > 0) {
+            html += '<ul>';
+            vendors.forEach(vendor => {
+                html += `<li>${vendor.name}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No vendors related to this system.</p>';
+        }
+        html += '</div>';
+    }
+    else if (itemType === 'vendor') {
+        const vendor = bpm.getVendor(itemId);
+        if (!vendor) return;
+        
+        html += `<h3>Vendor: ${vendor.name}</h3>`;
+        
+        // Get processes for this vendor
+        const processes = bpm.getProcessesForVendor(itemId);
+        html += '<div class="detail-section"><strong>Processes:</strong>';
+        if (processes.length > 0) {
+            html += '<ul>';
+            processes.forEach(process => {
+                html += `<li>${process.name}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No processes linked to this vendor.</p>';
+        }
+        html += '</div>';
+        
+        // Get systems related to this vendor
+        const systems = bpm.getSystemsForVendor(itemId);
+        html += '<div class="detail-section"><strong>Related Systems:</strong>';
+        if (systems.length > 0) {
+            html += '<ul>';
+            systems.forEach(system => {
+                html += `<li>${system.name}</li>`;
+            });
+            html += '</ul>';
+        } else {
+            html += '<p>No systems related to this vendor.</p>';
+        }
+        html += '</div>';
+    } 
+    else {
+        // Hide detail box for other types
+        detailBox.style.display = 'none';
+        return;
+    }
+    
+    // Add CSS to the detail box
+    html += `
+    <style>
+        #detail-box h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+        .detail-section {
+            margin-bottom: 16px;
+        }
+        .detail-section strong {
+            color: #34495e;
+        }
+        .detail-section ul {
+            margin-top: 6px;
+            padding-left: 20px;
+        }
+        .detail-section li {
+            margin-bottom: 4px;
+        }
+    </style>
+    `;
+    
+    detailBox.innerHTML = html;
+    detailBox.style.display = 'block';
+}
+
+// Initialize visualization
+function initializeVisualization() {
+    updateVisualization(null, null);
+}
+
+// Create hierarchical data structure for visualization
+function createHierarchicalData(focusId = null, focusType = null) {
+    let nodes = [];
+    let links = [];
+    
+    // Determine which processes to include
+    let processesToInclude = [];
+    if (focusId && focusType === 'process') {
+        processesToInclude = [bpm.getProcess(focusId)];
+    } else if (focusId && focusType === 'system') {
+        processesToInclude = bpm.getProcessesForSystem(focusId);
+    } else if (focusId && focusType === 'vendor') {
+        processesToInclude = bpm.getProcessesForVendor(focusId);
+    } else {
+        processesToInclude = bpm.processes;
+    }
+    
+    // Add processes to nodes
+    processesToInclude.forEach(process => {
+        if (!process) return; // Skip if process is undefined
+        
+        nodes.push({
+            id: process.id,
+            name: process.name,
+            type: 'process',
+            level: 1
+        });
+        
+        // Add systems for this process
+        const systems = bpm.getSystemsForProcess(process.id);
+        systems.forEach(system => {
+            // Check if system already exists in nodes
+            const existingSystem = nodes.find(node => node.id === system.id);
+            if (!existingSystem) {
+                nodes.push({
+                    id: system.id,
+                    name: system.name,
+                    type: 'system',
+                    level: 2
+                });
+            }
+            
+            // Add link from process to system
+            links.push({
+                source: process.id,
+                target: system.id
+            });
+            
+            // Add vendors for this process
+            const vendors = bpm.getVendorsForProcess(process.id);
+            vendors.forEach(vendor => {
+                // Check if vendor already exists in nodes
+                const existingVendor = nodes.find(node => node.id === vendor.id);
+                if (!existingVendor) {
+                    nodes.push({
+                        id: vendor.id,
+                        name: vendor.name,
+                        type: 'vendor',
+                        level: 3
+                    });
+                }
+                
+                // Add link from system to vendor
+                links.push({
+                    source: system.id,
+                    target: vendor.id
+                });
+            });
+        });
+    });
+    
+    return { nodes, links };
+}
+
+// Update visualization based on selected item
+function updateVisualization(id, type) {
+    // Clear previous visualization
+    const visualizationElement = document.getElementById('visualization');
+    if (!visualizationElement) return;
+    
+    visualizationElement.innerHTML = '';
+    
+    const width = visualizationElement.clientWidth || 800;
+    const height = visualizationElement.clientHeight || 600;
+    
+    const svg = d3.select('#visualization')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height)
+        .call(d3.zoom().on('zoom', function(event) {
+            g.attr('transform', event.transform);
+        }));
+    
+    const g = svg.append('g')
+        .attr('transform', `translate(${width/2},50)`);
+    
+    // Create hierarchical data
+    const graphData = createHierarchicalData(id, type);
+    
+    // Create a stratify layout
+    const stratify = d3.stratify()
+        .id(d => d.id)
+        .parentId(d => {
+            if (d.level === 1) return null; // Processes are top level
+            // Find parent based on links
+            const link = graphData.links.find(link => link.target === d.id);
+            return link ? link.source : null;
+        });
+    
+    // Apply stratify to create hierarchy
+    let root;
+    try {
+        // Convert flat nodes to hierarchical structure
+        const hierarchicalData = [];
+        graphData.nodes.forEach(node => {
+            hierarchicalData.push({
+                id: node.id,
+                name: node.name,
+                type: node.type,
+                level: node.level,
+                parentId: node.level === 1 ? null : graphData.links.find(link => link.target === node.id)?.source
+            });
+        });
+        
+        // Create root for tree layout
+        root = stratify(hierarchicalData);
+    } catch (e) {
+        console.error("Error creating hierarchy:", e);
+        // Fallback to simple force-directed layout
+        createForceDirectedLayout(g, graphData.nodes, graphData.links);
+        return;
+    }
+    
+    // Create tree layout
+    const treeLayout = d3.tree()
+        .size([width - 100, height - 150])
+        .nodeSize([180, 100]);
+    
+    // Apply layout
+    treeLayout(root);
+    
+    // Create links
+    const link = g.selectAll(".link")
+        .data(root.links())
+        .enter()
+        .append("path")
+        .attr("class", "link")
+        .attr("d", d3.linkVertical()
+            .x(d => d.x)
+            .y(d => d.y));
+    
+    // Create nodes
+    const node = g.selectAll(".node")
+        .data(root.descendants())
+        .enter()
+        .append("g")
+        .attr("class", d => `node ${d.data.type ? d.data.type + '-node' : ''}`)
+        .attr("transform", d => `translate(${d.x},${d.y})`)
+        .on("click", function(event, d) {
+            event.stopPropagation();
+            if (d.data.id) {
+                handleNodeClick(event, d);
+            }
+        });
+    
+    // Create nodes with different shapes based on type
+    node.each(function(d) {
+        const element = d3.select(this);
+        
+        if (d.data.type === 'process') {
+            // Create rectangle for processes
+            element.append("rect")
+                .attr("width", 160)
+                .attr("height", 60)
+                .attr("x", -80)
+                .attr("y", -30)
+                .attr("rx", 5)
+                .attr("ry", 5)
+                .attr("class", "process-node");
+        } else if (d.data.type === 'system') {
+            // Create rounded rectangle for systems
+            element.append("rect")
+                .attr("width", 140)
+                .attr("height", 40)
+                .attr("x", -70)
+                .attr("y", -20)
+                .attr("rx", 20)
+                .attr("ry", 20)
+                .attr("class", "system-node");
+        } else if (d.data.type === 'vendor') {
+            // Create circle for vendors
+            element.append("circle")
+                .attr("r", 15)
+                .attr("class", "vendor-node");
+        }
+        
+        // Add text labels
+        if (d.data.name) {
+            element.append("text")
+                .attr("dy", d.data.type === 'vendor' ? 30 : 5)
+                .attr("text-anchor", "middle")
+                .attr("class", "node-label")
+                .text(d.data.name);
+        }
+    });
+}
+
+// Fallback to force-directed layout if tree layout fails
+function createForceDirectedLayout(g, nodes, links) {
+    // Create a simulation
+    const simulation = d3.forceSimulation(nodes)
+        .force("link", d3.forceLink(links).id(d => d.id).distance(150))
+        .force("charge", d3.forceManyBody().strength(-500))
+        .force("center", d3.forceCenter(0, 0))
+        .force("x", d3.forceX().strength(0.1))
+        .force("y", d3.forceY().strength(0.1));
+    
+    // Create links
+    const link = g.selectAll(".link")
+        .data(links)
+        .enter()
+        .append("line")
+        .attr("class", "link");
+    
+    // Create nodes
+    const node = g.selectAll(".node")
+        .data(nodes)
+        .enter()
+        .append("g")
+        .attr("class", d => `node ${d.type}-node`)
+        .call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended))
+        .on("click", function(event, d) {
+            event.stopPropagation();
+            handleNodeClick(event, { data: d });
+        });
+    
+    // Create node shapes
+    node.each(function(d) {
+        const element = d3.select(this);
+        
+        if (d.type === 'process') {
+            // Create rectangle for processes
+            element.append("rect")
+                .attr("width", 160)
+                .attr("height", 60)
+                .attr("x", -80)
+                .attr("y", -30)
+                .attr("rx", 5)
+                .attr("ry", 5)
+                .attr("class", "process-node");
+        } else if (d.type === 'system') {
+            // Create rounded rectangle for systems
+            element.append("rect")
+                .attr("width", 140)
+                .attr("height", 40)
+                .attr("x", -70)
+                .attr("y", -20)
+                .attr("rx", 20)
+                .attr("ry", 20)
+                .attr("class", "system-node");
+        } else if (d.type === 'vendor') {
+            // Create circle for vendors
+            element.append("circle")
+                .attr("r", 15)
+                .attr("class", "vendor-node");
+        }
+        
+        // Add text labels
+        element.append("text")
+            .attr("dy", d.type === 'vendor' ? 30 : 5)
+            .attr("text-anchor", "middle")
+            .attr("class", "node-label")
+            .text(d.name);
+    });
+    
+    // Update positions on tick
+    simulation.on("tick", () => {
+        link
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y);
+        
+        node.attr("transform", d => `translate(${d.x},${d.y})`);
+    });
+    
+    // Drag functions
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+    
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+    
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+}
+
+// Handle node click for drill down
+function handleNodeClick(event, d) {
+    event.stopPropagation();
+    
+    // Skip if it doesn't have an ID
+    if (!d.data.id) return;
+    
+    // Store previous state for drill-up
+    const previousState = {...currentViewState};
+    
+    // Update current view state
+    currentViewState = {
+        id: d.data.id,
+        type: d.data.type,
+        parentId: previousState.id,
+        parentType: previousState.type
+    };
+    
+    // Update selection in the sidebar
+    selectedItemId = d.data.id;
+    selectedItemType = d.data.type;
+    
+    document.querySelectorAll('.item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const selectedElement = document.querySelector(`.item[data-id="${selectedItemId}"][data-type="${selectedItemType}"]`);
+    if (selectedElement) {
+        selectedElement.classList.add('active');
+    }
+    
+    // Update visualization with new focus
+    updateVisualization(d.data.id, d.data.type);
+    
+    // Show detail box
+    showDetailBox(d.data.id, d.data.type);
+    
+    // Show drill-up button
+    const drillUpBtn = document.getElementById('drill-up-btn');
+    if (drillUpBtn) {
+        drillUpBtn.style.display = 'block';
+    }
+}
+
+// Capitalize the first letter of a string
+function capitalize(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
