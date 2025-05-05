@@ -397,19 +397,20 @@ class BusinessProcessManager {
     }
 }
 
-// Initial data structure
+// Initial data structure with a system that supports all processes
 const initialData = {
     processes: [
-        { id: 'p1', name: 'Customer Onboarding', systems: ['s1', 's3'], vendors: ['v2'] },
-        { id: 'p2', name: 'Order Processing', systems: ['s1', 's2'], vendors: ['v1'] },
-        { id: 'p3', name: 'Inventory Management', systems: ['s2'], vendors: ['v3'] },
-        { id: 'p4', name: 'Financial Reporting', systems: ['s2', 's4'], vendors: ['v1', 'v2'] }
+        { id: 'p1', name: 'Customer Onboarding', systems: ['s1', 's3', 's5'], vendors: ['v2'] },
+        { id: 'p2', name: 'Order Processing', systems: ['s1', 's2', 's5'], vendors: ['v1'] },
+        { id: 'p3', name: 'Inventory Management', systems: ['s2', 's5'], vendors: ['v3'] },
+        { id: 'p4', name: 'Financial Reporting', systems: ['s2', 's4', 's5'], vendors: ['v1', 'v2'] }
     ],
     systems: [
         { id: 's1', name: 'CRM System' },
         { id: 's2', name: 'ERP Platform' },
         { id: 's3', name: 'Customer Portal' },
-        { id: 's4', name: 'Business Intelligence Tool' }
+        { id: 's4', name: 'Business Intelligence Tool' },
+        { id: 's5', name: 'Enterprise Core System' } // This system supports all processes
     ],
     vendors: [
         { id: 'v1', name: 'Cloud Provider' },
@@ -491,4 +492,509 @@ function renderList(type, items) {
         itemElement.dataset.type = type;
         
         // Check if this item is selected
-        if (selectedItemId === item.
+        if (selectedItemId === item.id && selectedItemType === type) {
+            itemElement.classList.add('active');
+        }
+        
+        // Create item content
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = item.name;
+        itemElement.appendChild(nameSpan);
+        
+        // Add edit button (visible in admin mode)
+        if (adminMode) {
+            const editButton = document.createElement('button');
+            editButton.className = 'edit-btn';
+            editButton.textContent = 'Edit';
+            editButton.onclick = function(e) {
+                e.stopPropagation();
+                openEditModal(type, item.id);
+            };
+            itemElement.appendChild(editButton);
+        }
+        
+        // Add click event to select the item
+        itemElement.addEventListener('click', function() {
+            selectItem(item.id, type);
+        });
+        
+        listElement.appendChild(itemElement);
+    });
+}
+
+// Set up event listeners
+function setupEventListeners() {
+    // Admin mode toggle
+    const adminToggle = document.getElementById('admin-toggle');
+    if (adminToggle) {
+        adminToggle.addEventListener('click', toggleAdminMode);
+    }
+    
+    // Add buttons
+    const addProcess = document.getElementById('add-process');
+    const addSystem = document.getElementById('add-system');
+    const addVendor = document.getElementById('add-vendor');
+    
+    if (addProcess) addProcess.addEventListener('click', () => openAddModal('process'));
+    if (addSystem) addSystem.addEventListener('click', () => openAddModal('system'));
+    if (addVendor) addVendor.addEventListener('click', () => openAddModal('vendor'));
+    
+    // Modal close button
+    const closeBtn = document.querySelector('.close');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeModal);
+    }
+    
+    // Modal background click to close
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    }
+    
+    // Form submission
+    const itemForm = document.getElementById('item-form');
+    if (itemForm) {
+        itemForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveItem();
+        });
+    }
+    
+    // Delete button
+    const deleteBtn = document.getElementById('delete-item');
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', deleteItem);
+    }
+    
+    // Hide detail box when clicking outside items
+    window.addEventListener('click', function(event) {
+        const detailBox = document.getElementById('detail-box');
+        if (!detailBox) return;
+        
+        if (!event.target.closest('.item') && 
+            !event.target.closest('#detail-box') && 
+            !event.target.closest('.node') && 
+            !event.target.closest('#drill-up-btn')) {
+            detailBox.style.display = 'none';
+        }
+    });
+}
+
+// Toggle admin mode
+function toggleAdminMode() {
+    adminMode = !adminMode;
+    const adminToggle = document.getElementById('admin-toggle');
+    
+    if (adminMode) {
+        adminToggle.textContent = 'Exit Admin Mode';
+        adminToggle.classList.add('active');
+        
+        const addProcess = document.getElementById('add-process');
+        const addSystem = document.getElementById('add-system');
+        const addVendor = document.getElementById('add-vendor');
+        
+        if (addProcess) addProcess.style.display = 'flex';
+        if (addSystem) addSystem.style.display = 'flex';
+        if (addVendor) addVendor.style.display = 'flex';
+    } else {
+        adminToggle.textContent = 'Admin Mode';
+        adminToggle.classList.remove('active');
+        
+        const addProcess = document.getElementById('add-process');
+        const addSystem = document.getElementById('add-system');
+        const addVendor = document.getElementById('add-vendor');
+        
+        if (addProcess) addProcess.style.display = 'none';
+        if (addSystem) addSystem.style.display = 'none';
+        if (addVendor) addVendor.style.display = 'none';
+    }
+    
+    // Re-render lists to show/hide edit buttons
+    renderLists();
+}
+
+// Select an item (process, system, or vendor)
+function selectItem(id, type) {
+    selectedItemId = id;
+    selectedItemType = type;
+    
+    // Store previous state for drill-up
+    const previousState = {...currentViewState};
+    
+    // Update current view state
+    currentViewState = {
+        id: id,
+        type: type,
+        parentId: previousState.id,
+        parentType: previousState.type
+    };
+    
+    // Update active class in lists
+    document.querySelectorAll('.item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    const selectedElement = document.querySelector(`.item[data-id="${id}"][data-type="${type}"]`);
+    if (selectedElement) {
+        selectedElement.classList.add('active');
+    }
+    
+    // Update visualization
+    updateVisualization(id, type);
+    
+    // Show detail box
+    showDetailBox(id, type);
+    
+    // Show drill-up button if we're not at the top level
+    const drillUpBtn = document.getElementById('drill-up-btn');
+    if (drillUpBtn && currentViewState.id !== null) {
+        drillUpBtn.style.display = 'block';
+    }
+}
+
+// Open modal for adding a new item
+function openAddModal(type) {
+    currentItemType = type;
+    currentItemId = null;
+    
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = `Add New ${capitalize(type)}`;
+    }
+    
+    const nameInput = document.getElementById('item-name');
+    if (nameInput) {
+        nameInput.value = '';
+    }
+    
+    const deleteBtn = document.getElementById('delete-item');
+    if (deleteBtn) {
+        deleteBtn.style.display = 'none';
+    }
+    
+    // Show/hide process-specific fields
+    const processFields = document.getElementById('process-specific-fields');
+    if (processFields) {
+        if (type === 'process') {
+            processFields.style.display = 'block';
+            populateCheckboxes();
+        } else {
+            processFields.style.display = 'none';
+        }
+    }
+    
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// Open modal for editing an existing item
+function openEditModal(type, id) {
+    currentItemType = type;
+    currentItemId = id;
+    
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = `Edit ${capitalize(type)}`;
+    }
+    
+    let item;
+    const nameInput = document.getElementById('item-name');
+    const processFields = document.getElementById('process-specific-fields');
+    
+    if (type === 'process') {
+        item = bpm.getProcess(id);
+        if (nameInput) nameInput.value = item.name;
+        if (processFields) processFields.style.display = 'block';
+        populateCheckboxes(item);
+    } else if (type === 'system') {
+        item = bpm.getSystem(id);
+        if (nameInput) nameInput.value = item.name;
+        if (processFields) processFields.style.display = 'none';
+    } else if (type === 'vendor') {
+        item = bpm.getVendor(id);
+        if (nameInput) nameInput.value = item.name;
+        if (processFields) processFields.style.display = 'none';
+    }
+    
+    const deleteBtn = document.getElementById('delete-item');
+    if (deleteBtn) {
+        deleteBtn.style.display = 'block';
+    }
+    
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// Close the modal
+function closeModal() {
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Populate checkboxes for systems and vendors
+function populateCheckboxes(process = null) {
+    const systemsCheckboxes = document.getElementById('systems-checkboxes');
+    const vendorsCheckboxes = document.getElementById('vendors-checkboxes');
+    
+    if (!systemsCheckboxes || !vendorsCheckboxes) return;
+    
+    systemsCheckboxes.innerHTML = '';
+    vendorsCheckboxes.innerHTML = '';
+    
+    // Add system checkboxes
+    bpm.systems.forEach(system => {
+        const checkboxItem = document.createElement('div');
+        checkboxItem.className = 'checkbox-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `system-${system.id}`;
+        checkbox.value = system.id;
+        
+        // Check if this system is related to the process
+        if (process && bpm._processToSystems.get(process.id)?.has(system.id)) {
+            checkbox.checked = true;
+        }
+        
+        const label = document.createElement('label');
+        label.htmlFor = `system-${system.id}`;
+        label.textContent = system.name;
+        
+        checkboxItem.appendChild(checkbox);
+        checkboxItem.appendChild(label);
+        systemsCheckboxes.appendChild(checkboxItem);
+    });
+    
+    // Add vendor checkboxes
+    bpm.vendors.forEach(vendor => {
+        const checkboxItem = document.createElement('div');
+        checkboxItem.className = 'checkbox-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `vendor-${vendor.id}`;
+        checkbox.value = vendor.id;
+        
+        // Check if this vendor is related to the process
+        if (process && bpm._processToVendors.get(process.id)?.has(vendor.id)) {
+            checkbox.checked = true;
+        }
+        
+        const label = document.createElement('label');
+        label.htmlFor = `vendor-${vendor.id}`;
+        label.textContent = vendor.name;
+        
+        checkboxItem.appendChild(checkbox);
+        checkboxItem.appendChild(label);
+        vendorsCheckboxes.appendChild(checkboxItem);
+    });
+}
+
+// Save the current item
+function saveItem() {
+    const nameInput = document.getElementById('item-name');
+    if (!nameInput) return;
+    
+    const name = nameInput.value.trim();
+    
+    if (!name) {
+        alert('Please enter a name');
+        return;
+    }
+    
+    if (currentItemType === 'process') {
+        // Get selected systems
+        const selectedSystems = Array.from(document.querySelectorAll('#systems-checkboxes input:checked'))
+            .map(checkbox => checkbox.value);
+        
+        // Get selected vendors
+        const selectedVendors = Array.from(document.querySelectorAll('#vendors-checkboxes input:checked'))
+            .map(checkbox => checkbox.value);
+        
+        if (currentItemId) {
+            // Update existing process
+            bpm.updateProcess(currentItemId, name, selectedSystems, selectedVendors);
+        } else {
+            // Add new process
+            const newId = bpm.generateId('process');
+            bpm.addProcess(newId, name);
+            bpm.updateProcess(newId, name, selectedSystems, selectedVendors);
+        }
+    } else if (currentItemType === 'system') {
+        if (currentItemId) {
+            // Update existing system
+            bpm.updateSystem(currentItemId, name);
+        } else {
+            // Add new system
+            const newId = bpm.generateId('system');
+            bpm.addSystem(newId, name);
+        }
+    } else if (currentItemType === 'vendor') {
+        if (currentItemId) {
+            // Update existing vendor
+            bpm.updateVendor(currentItemId, name);
+        } else {
+            // Add new vendor
+            const newId = bpm.generateId('vendor');
+            bpm.addVendor(newId, name);
+        }
+    }
+    
+    // Save data and update UI
+    saveDataToLocalStorage();
+    renderLists();
+    closeModal();
+    
+    // Update visualization if needed
+    if (selectedItemId) {
+        updateVisualization(selectedItemId, selectedItemType);
+    } else {
+        initializeVisualization();
+    }
+}
+
+// Delete the current item
+function deleteItem() {
+    if (!currentItemId) return;
+    
+    if (!confirm(`Are you sure you want to delete this ${currentItemType}?`)) {
+        return;
+    }
+    
+    if (currentItemType === 'process') {
+        bpm.deleteProcess(currentItemId);
+    } else if (currentItemType === 'system') {
+        bpm.deleteSystem(currentItemId);
+    } else if (currentItemType === 'vendor') {
+        bpm.deleteVendor(currentItemId);
+    }
+    
+    // Save data and update UI
+    saveDataToLocalStorage();
+    renderLists();
+    closeModal();
+    
+    // Reset selection if the deleted item was selected
+    if (selectedItemId === currentItemId && selectedItemType === currentItemType) {
+        selectedItemId = null;
+        selectedItemType = null;
+        currentViewState = {
+            id: null,
+            type: null,
+            parentId: null,
+            parentType: null
+        };
+        
+        const drillUpBtn = document.getElementById('drill-up-btn');
+        if (drillUpBtn) {
+            drillUpBtn.style.display = 'none';
+        }
+        
+        initializeVisualization(); // Reset visualization
+    } else if (selectedItemId) {
+        // Update visualization if another item is selected
+        updateVisualization(selectedItemId, selectedItemType);
+    }
+}
+
+// Add drill-up button to the header
+function addDrillUpButton() {
+    const header = document.querySelector('header');
+    if (!header) return;
+    
+    const button = document.createElement('button');
+    button.id = 'drill-up-btn';
+    button.className = 'control-btn';
+    button.textContent = '↑ Up';
+    button.style.display = 'none';
+    button.onclick = drillUp;
+    
+    header.appendChild(button);
+}
+
+// Drill up function
+function drillUp() {
+    if (currentViewState.parentId) {
+        // Go to parent view
+        updateVisualization(currentViewState.parentId, currentViewState.parentType);
+        showDetailBox(currentViewState.parentId, currentViewState.parentType);
+        
+        // Update selection in the sidebar
+        selectedItemId = currentViewState.parentId;
+        selectedItemType = currentViewState.parentType;
+        
+        document.querySelectorAll('.item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        const selectedElement = document.querySelector(`.item[data-id="${selectedItemId}"][data-type="${selectedItemType}"]`);
+        if (selectedElement) {
+            selectedElement.classList.add('active');
+        }
+        
+        // Update current view state
+        currentViewState = {
+            id: currentViewState.parentId,
+            type: currentViewState.parentType,
+            parentId: null, // We'd need to track more history for multi-level drill-up
+            parentType: null
+        };
+    } else {
+        // Go to top level view
+        initializeVisualization();
+        
+        // Clear selection
+        selectedItemId = null;
+        selectedItemType = null;
+        
+        document.querySelectorAll('.item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Update current view state
+        currentViewState = {
+            id: null,
+            type: null,
+            parentId: null,
+            parentType: null
+        };
+        
+        // Hide detail box
+        const detailBox = document.getElementById('detail-box');
+        if (detailBox) {
+            detailBox.style.display = 'none';
+        }
+        
+        // Hide drill-up button at top level
+        const drillUpBtn = document.getElementById('drill-up-btn');
+        if (drillUpBtn) {
+            drillUpBtn.style.display = 'none';
+        }
+    }
+}
+
+// Add detail box to the visualization container
+function addDetailBox() {
+    const visualizationContainer = document.querySelector('.visualization-container');
+    if (!visualizationContainer) return;
+    
+    const detailBox = document.createElement('div');
+    detailBox.id = 'detail-box';
+    detailBox.style.display = 'none';
+    
+    visualizationContainer.appendChild(detailBox);
+}
+
+// Show detail box for a process, system, or vendor
+function showDetailBox(itemId, itemType) {
+    const detailBox = document.
