@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
+/**
+ * Get all data from the database..
+ * @return array The complete data structure
+ */
+    <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Business Process Visualization</title>
