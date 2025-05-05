@@ -1,20 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Business Process Visualization</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <header>
         <h1>Business Process Visualization</h1>
         <button id="admin-toggle" class="control-btn">Admin Mode</button>
     </header>
-
     <main>
         <div class="container">
-            <div class="sidebar">
+            <aside class="sidebar">
                 <div class="section-header">
                     <h2>Business Processes</h2>
                     <button id="add-process" class="add-btn" style="display:none;">+</button>
@@ -32,15 +31,13 @@
                     <button id="add-vendor" class="add-btn" style="display:none;">+</button>
                 </div>
                 <div id="vendor-list" class="item-list"></div>
-            </div>
-
-            <div class="visualization-container">
+            </aside>
+            <section class="visualization-container">
                 <div id="visualization"></div>
-            </div>
+            </section>
         </div>
     </main>
-
-    <!-- Modal for adding/editing items -->
+    <!-- Modal for add/edit -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
@@ -67,7 +64,6 @@
             </form>
         </div>
     </div>
-
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="app.js"></script>
 </body>
