@@ -1,402 +1,3 @@
-// Business Process Manager Class for efficient relationship manager
-class BusinessProcessManager {
-    constructor(initialData = null) {
-        this.processes = [];
-        this.systems = [];
-        this.vendors = [];
-        
-        // Relationship maps for quick lookups
-        this._processToSystems = new Map(); // process ID -> set of system IDs
-        this._processToVendors = new Map(); // process ID -> set of vendor IDs
-        this._systemToProcesses = new Map(); // system ID -> set of process IDs
-        this._vendorToProcesses = new Map(); // vendor ID -> set of process IDs
-        
-        if (initialData) {
-            this.loadData(initialData);
-        }
-    }
-    
-    // Load data from the old format
-    loadData(data) {
-        // Clear existing data
-        this.processes = [];
-        this.systems = [];
-        this.vendors = [];
-        this._processToSystems.clear();
-        this._processToVendors.clear();
-        this._systemToProcesses.clear();
-        this._vendorToProcesses.clear();
-        
-        // Load systems
-        if (data.systems) {
-            data.systems.forEach(system => {
-                this.addSystem(system.id, system.name);
-            });
-        }
-        
-        // Load vendors
-        if (data.vendors) {
-            data.vendors.forEach(vendor => {
-                this.addVendor(vendor.id, vendor.name);
-            });
-        }
-        
-        // Load processes and their relationships
-        if (data.processes) {
-            data.processes.forEach(process => {
-                this.addProcess(process.id, process.name);
-                
-                // Add system relationships
-                if (process.systems) {
-                    process.systems.forEach(systemId => {
-                        this.linkProcessToSystem(process.id, systemId);
-                    });
-                }
-                
-                // Add vendor relationships
-                if (process.vendors) {
-                    process.vendors.forEach(vendorId => {
-                        this.linkProcessToVendor(process.id, vendorId);
-                    });
-                }
-            });
-        }
-    }
-    
-    // Export data to the old format for compatibility
-    exportData() {
-        return {
-            processes: this.processes.map(process => ({
-                id: process.id,
-                name: process.name,
-                systems: Array.from(this._processToSystems.get(process.id) || []),
-                vendors: Array.from(this._processToVendors.get(process.id) || [])
-            })),
-            systems: this.systems.map(system => ({
-                id: system.id,
-                name: system.name
-            })),
-            vendors: this.vendors.map(vendor => ({
-                id: vendor.id,
-                name: vendor.name
-            }))
-        };
-    }
-    
-    // Add a new process
-    addProcess(id, name) {
-        if (!this.getProcess(id)) {
-            this.processes.push({ id, name });
-            this._processToSystems.set(id, new Set());
-            this._processToVendors.set(id, new Set());
-            return true;
-        }
-        return false;
-    }
-    
-    // Add a new system
-    addSystem(id, name) {
-        if (!this.getSystem(id)) {
-            this.systems.push({ id, name });
-            this._systemToProcesses.set(id, new Set());
-            return true;
-        }
-        return false;
-    }
-    
-    // Add a new vendor
-    addVendor(id, name) {
-        if (!this.getVendor(id)) {
-            this.vendors.push({ id, name });
-            this._vendorToProcesses.set(id, new Set());
-            return true;
-        }
-        return false;
-    }
-    
-    // Link a process to a system
-    linkProcessToSystem(processId, systemId) {
-        const process = this.getProcess(processId);
-        const system = this.getSystem(systemId);
-        
-        if (process && system) {
-            this._processToSystems.get(processId).add(systemId);
-            this._systemToProcesses.get(systemId).add(processId);
-            return true;
-        }
-        return false;
-    }
-    
-    // Link a process to a vendor
-    linkProcessToVendor(processId, vendorId) {
-        const process = this.getProcess(processId);
-        const vendor = this.getVendor(vendorId);
-        
-        if (process && vendor) {
-            this._processToVendors.get(processId).add(vendorId);
-            this._vendorToProcesses.get(vendorId).add(processId);
-            return true;
-        }
-        return false;
-    }
-    
-    // Unlink a process from a system
-    unlinkProcessFromSystem(processId, systemId) {
-        if (this._processToSystems.has(processId) && this._systemToProcesses.has(systemId)) {
-            this._processToSystems.get(processId).delete(systemId);
-            this._systemToProcesses.get(systemId).delete(processId);
-            return true;
-        }
-        return false;
-    }
-    
-    // Unlink a process from a vendor
-    unlinkProcessFromVendor(processId, vendorId) {
-        if (this._processToVendors.has(processId) && this._vendorToProcesses.has(vendorId)) {
-            this._processToVendors.get(processId).delete(vendorId);
-            this._vendorToProcesses.get(vendorId).delete(processId);
-            return true;
-        }
-        return false;
-    }
-    
-    // Update a process
-    updateProcess(id, name, systemIds, vendorIds) {
-        const process = this.getProcess(id);
-        if (!process) return false;
-        
-        // Update name
-        process.name = name;
-        
-        // Update system relationships
-        const currentSystems = this._processToSystems.get(id);
-        const newSystems = new Set(systemIds);
-        
-        // Remove old relationships
-        for (const sysId of currentSystems) {
-            if (!newSystems.has(sysId)) {
-                this.unlinkProcessFromSystem(id, sysId);
-            }
-        }
-        
-        // Add new relationships
-        for (const sysId of newSystems) {
-            if (!currentSystems.has(sysId)) {
-                this.linkProcessToSystem(id, sysId);
-            }
-        }
-        
-        // Update vendor relationships
-        const currentVendors = this._processToVendors.get(id);
-        const newVendors = new Set(vendorIds);
-        
-        // Remove old relationships
-        for (const vendorId of currentVendors) {
-            if (!newVendors.has(vendorId)) {
-                this.unlinkProcessFromVendor(id, vendorId);
-            }
-        }
-        
-        // Add new relationships
-        for (const vendorId of newVendors) {
-            if (!currentVendors.has(vendorId)) {
-                this.linkProcessToVendor(id, vendorId);
-            }
-        }
-        
-        return true;
-    }
-    
-    // Update a system
-    updateSystem(id, name) {
-        const system = this.getSystem(id);
-        if (system) {
-            system.name = name;
-            return true;
-        }
-        return false;
-    }
-    
-    // Update a vendor
-    updateVendor(id, name) {
-        const vendor = this.getVendor(id);
-        if (vendor) {
-            vendor.name = name;
-            return true;
-        }
-        return false;
-    }
-    
-    // Delete a process
-    deleteProcess(id) {
-        const index = this.processes.findIndex(p => p.id === id);
-        if (index === -1) return false;
-        
-        // Remove all relationships
-        const systemIds = this._processToSystems.get(id);
-        if (systemIds) {
-            for (const sysId of systemIds) {
-                this._systemToProcesses.get(sysId).delete(id);
-            }
-        }
-        
-        const vendorIds = this._processToVendors.get(id);
-        if (vendorIds) {
-            for (const vendorId of vendorIds) {
-                this._vendorToProcesses.get(vendorId).delete(id);
-            }
-        }
-        
-        // Remove from maps
-        this._processToSystems.delete(id);
-        this._processToVendors.delete(id);
-        
-        // Remove from array
-        this.processes.splice(index, 1);
-        return true;
-    }
-    
-    // Delete a system
-    deleteSystem(id) {
-        const index = this.systems.findIndex(s => s.id === id);
-        if (index === -1) return false;
-        
-        // Remove all relationships
-        const processIds = this._systemToProcesses.get(id);
-        if (processIds) {
-            for (const processId of processIds) {
-                this._processToSystems.get(processId).delete(id);
-            }
-        }
-        
-        // Remove from maps
-        this._systemToProcesses.delete(id);
-        
-        // Remove from array
-        this.systems.splice(index, 1);
-        return true;
-    }
-    
-    // Delete a vendor
-    deleteVendor(id) {
-        const index = this.vendors.findIndex(v => v.id === id);
-        if (index === -1) return false;
-        
-        // Remove all relationships
-        const processIds = this._vendorToProcesses.get(id);
-        if (processIds) {
-            for (const processId of processIds) {
-                this._processToVendors.get(processId).delete(id);
-            }
-        }
-        
-        // Remove from maps
-        this._vendorToProcesses.delete(id);
-        
-        // Remove from array
-        this.vendors.splice(index, 1);
-        return true;
-    }
-    
-    // Get a process by ID
-    getProcess(id) {
-        return this.processes.find(p => p.id === id);
-    }
-    
-    // Get a system by ID
-    getSystem(id) {
-        return this.systems.find(s => s.id === id);
-    }
-    
-    // Get a vendor by ID
-    getVendor(id) {
-        return this.vendors.find(v => v.id === id);
-    }
-    
-    // Get all systems for a process
-    getSystemsForProcess(processId) {
-        const systemIds = this._processToSystems.get(processId);
-        if (!systemIds) return [];
-        
-        return this.systems.filter(system => systemIds.has(system.id));
-    }
-    
-    // Get all vendors for a process
-    getVendorsForProcess(processId) {
-        const vendorIds = this._processToVendors.get(processId);
-        if (!vendorIds) return [];
-        
-        return this.vendors.filter(vendor => vendorIds.has(vendor.id));
-    }
-    
-    // Get all processes for a system
-    getProcessesForSystem(systemId) {
-        const processIds = this._systemToProcesses.get(systemId);
-        if (!processIds) return [];
-        
-        return this.processes.filter(process => processIds.has(process.id));
-    }
-    
-    // Get all processes for a vendor
-    getProcessesForVendor(vendorId) {
-        const processIds = this._vendorToProcesses.get(vendorId);
-        if (!processIds) return [];
-        
-        return this.processes.filter(process => processIds.has(process.id));
-    }
-    
-    // Get all vendors related to a system (through processes)
-    getVendorsForSystem(systemId) {
-        const processes = this.getProcessesForSystem(systemId);
-        const vendorSet = new Set();
-        
-        processes.forEach(process => {
-            const vendorIds = this._processToVendors.get(process.id);
-            if (vendorIds) {
-                for (const vendorId of vendorIds) {
-                    vendorSet.add(vendorId);
-                }
-            }
-        });
-        
-        return this.vendors.filter(vendor => vendorSet.has(vendor.id));
-    }
-    
-    // Get all systems related to a vendor (through processes)
-    getSystemsForVendor(vendorId) {
-        const processes = this.getProcessesForVendor(vendorId);
-        const systemSet = new Set();
-        
-        processes.forEach(process => {
-            const systemIds = this._processToSystems.get(process.id);
-            if (systemIds) {
-                for (const systemId of systemIds) {
-                    systemSet.add(systemId);
-                }
-            }
-        });
-        
-        return this.systems.filter(system => systemSet.has(system.id));
-    }
-    
-    // Generate a unique ID for a new item
-    generateId(type) {
-        const prefix = type === 'process' ? 'p' : type === 'system' ? 's' : 'v';
-        const items = type === 'process' ? this.processes : 
-                     type === 'system' ? this.systems : this.vendors;
-        
-        let maxNum = 0;
-        items.forEach(item => {
-            const idNum = parseInt(item.id.substring(1));
-            if (idNum > maxNum) {
-                maxNum = idNum;
-            }
-        });
-        
-        return `${prefix}${maxNum + 1}`;
-    }
-}
-
 // Initial data structure with a system that supports all processes
 const initialData = {
     processes: [
@@ -419,10 +20,8 @@ const initialData = {
     ]
 };
 
-// Initialize the business process manager
-const bpm = new BusinessProcessManager(initialData);
-
 // Global variables
+let data = initialData;
 let adminMode = false;
 let currentItemType = null;
 let currentItemId = null;
@@ -437,8 +36,10 @@ let currentViewState = {
     parentType: null
 };
 
-// Initialize the application
+// Initialize the application when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOM fully loaded");
+    
     // Load data from localStorage if available
     loadDataFromLocalStorage();
     
@@ -451,37 +52,44 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add drill-up button
     addDrillUpButton();
     
-    // Initialize visualization
-    initializeVisualization();
-    
     // Add detail box
     addDetailBox();
+    
+    // Initialize visualization
+    initializeVisualization();
 });
 
 // Load data from localStorage
 function loadDataFromLocalStorage() {
     const savedData = localStorage.getItem('businessProcessData');
     if (savedData) {
-        bpm.loadData(JSON.parse(savedData));
+        data = JSON.parse(savedData);
+        console.log("Loaded data from localStorage");
+    } else {
+        console.log("Using initial data");
     }
 }
 
 // Save data to localStorage
 function saveDataToLocalStorage() {
-    localStorage.setItem('businessProcessData', JSON.stringify(bpm.exportData()));
+    localStorage.setItem('businessProcessData', JSON.stringify(data));
+    console.log("Saved data to localStorage");
 }
 
 // Render the process, system, and vendor lists
 function renderLists() {
-    renderList('process', bpm.processes);
-    renderList('system', bpm.systems);
-    renderList('vendor', bpm.vendors);
+    renderList('process', data.processes);
+    renderList('system', data.systems);
+    renderList('vendor', data.vendors);
 }
 
 // Render a specific list (process, system, or vendor)
 function renderList(type, items) {
     const listElement = document.getElementById(`${type}-list`);
-    if (!listElement) return;
+    if (!listElement) {
+        console.error(`List element for ${type} not found`);
+        return;
+    }
     
     listElement.innerHTML = '';
     
@@ -656,257 +264,6 @@ function selectItem(id, type) {
     }
 }
 
-// Open modal for adding a new item
-function openAddModal(type) {
-    currentItemType = type;
-    currentItemId = null;
-    
-    const modalTitle = document.getElementById('modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = `Add New ${capitalize(type)}`;
-    }
-    
-    const nameInput = document.getElementById('item-name');
-    if (nameInput) {
-        nameInput.value = '';
-    }
-    
-    const deleteBtn = document.getElementById('delete-item');
-    if (deleteBtn) {
-        deleteBtn.style.display = 'none';
-    }
-    
-    // Show/hide process-specific fields
-    const processFields = document.getElementById('process-specific-fields');
-    if (processFields) {
-        if (type === 'process') {
-            processFields.style.display = 'block';
-            populateCheckboxes();
-        } else {
-            processFields.style.display = 'none';
-        }
-    }
-    
-    const modal = document.getElementById('modal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
-}
-
-// Open modal for editing an existing item
-function openEditModal(type, id) {
-    currentItemType = type;
-    currentItemId = id;
-    
-    const modalTitle = document.getElementById('modal-title');
-    if (modalTitle) {
-        modalTitle.textContent = `Edit ${capitalize(type)}`;
-    }
-    
-    let item;
-    const nameInput = document.getElementById('item-name');
-    const processFields = document.getElementById('process-specific-fields');
-    
-    if (type === 'process') {
-        item = bpm.getProcess(id);
-        if (nameInput) nameInput.value = item.name;
-        if (processFields) processFields.style.display = 'block';
-        populateCheckboxes(item);
-    } else if (type === 'system') {
-        item = bpm.getSystem(id);
-        if (nameInput) nameInput.value = item.name;
-        if (processFields) processFields.style.display = 'none';
-    } else if (type === 'vendor') {
-        item = bpm.getVendor(id);
-        if (nameInput) nameInput.value = item.name;
-        if (processFields) processFields.style.display = 'none';
-    }
-    
-    const deleteBtn = document.getElementById('delete-item');
-    if (deleteBtn) {
-        deleteBtn.style.display = 'block';
-    }
-    
-    const modal = document.getElementById('modal');
-    if (modal) {
-        modal.style.display = 'block';
-    }
-}
-
-// Close the modal
-function closeModal() {
-    const modal = document.getElementById('modal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-// Populate checkboxes for systems and vendors
-function populateCheckboxes(process = null) {
-    const systemsCheckboxes = document.getElementById('systems-checkboxes');
-    const vendorsCheckboxes = document.getElementById('vendors-checkboxes');
-    
-    if (!systemsCheckboxes || !vendorsCheckboxes) return;
-    
-    systemsCheckboxes.innerHTML = '';
-    vendorsCheckboxes.innerHTML = '';
-    
-    // Add system checkboxes
-    bpm.systems.forEach(system => {
-        const checkboxItem = document.createElement('div');
-        checkboxItem.className = 'checkbox-item';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = `system-${system.id}`;
-        checkbox.value = system.id;
-        
-        // Check if this system is related to the process
-        if (process && bpm._processToSystems.get(process.id)?.has(system.id)) {
-            checkbox.checked = true;
-        }
-        
-        const label = document.createElement('label');
-        label.htmlFor = `system-${system.id}`;
-        label.textContent = system.name;
-        
-        checkboxItem.appendChild(checkbox);
-        checkboxItem.appendChild(label);
-        systemsCheckboxes.appendChild(checkboxItem);
-    });
-    
-    // Add vendor checkboxes
-    bpm.vendors.forEach(vendor => {
-        const checkboxItem = document.createElement('div');
-        checkboxItem.className = 'checkbox-item';
-        
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = `vendor-${vendor.id}`;
-        checkbox.value = vendor.id;
-        
-        // Check if this vendor is related to the process
-        if (process && bpm._processToVendors.get(process.id)?.has(vendor.id)) {
-            checkbox.checked = true;
-        }
-        
-        const label = document.createElement('label');
-        label.htmlFor = `vendor-${vendor.id}`;
-        label.textContent = vendor.name;
-        
-        checkboxItem.appendChild(checkbox);
-        checkboxItem.appendChild(label);
-        vendorsCheckboxes.appendChild(checkboxItem);
-    });
-}
-
-// Save the current item
-function saveItem() {
-    const nameInput = document.getElementById('item-name');
-    if (!nameInput) return;
-    
-    const name = nameInput.value.trim();
-    
-    if (!name) {
-        alert('Please enter a name');
-        return;
-    }
-    
-    if (currentItemType === 'process') {
-        // Get selected systems
-        const selectedSystems = Array.from(document.querySelectorAll('#systems-checkboxes input:checked'))
-            .map(checkbox => checkbox.value);
-        
-        // Get selected vendors
-        const selectedVendors = Array.from(document.querySelectorAll('#vendors-checkboxes input:checked'))
-            .map(checkbox => checkbox.value);
-        
-        if (currentItemId) {
-            // Update existing process
-            bpm.updateProcess(currentItemId, name, selectedSystems, selectedVendors);
-        } else {
-            // Add new process
-            const newId = bpm.generateId('process');
-            bpm.addProcess(newId, name);
-            bpm.updateProcess(newId, name, selectedSystems, selectedVendors);
-        }
-    } else if (currentItemType === 'system') {
-        if (currentItemId) {
-            // Update existing system
-            bpm.updateSystem(currentItemId, name);
-        } else {
-            // Add new system
-            const newId = bpm.generateId('system');
-            bpm.addSystem(newId, name);
-        }
-    } else if (currentItemType === 'vendor') {
-        if (currentItemId) {
-            // Update existing vendor
-            bpm.updateVendor(currentItemId, name);
-        } else {
-            // Add new vendor
-            const newId = bpm.generateId('vendor');
-            bpm.addVendor(newId, name);
-        }
-    }
-    
-    // Save data and update UI
-    saveDataToLocalStorage();
-    renderLists();
-    closeModal();
-    
-    // Update visualization if needed
-    if (selectedItemId) {
-        updateVisualization(selectedItemId, selectedItemType);
-    } else {
-        initializeVisualization();
-    }
-}
-
-// Delete the current item
-function deleteItem() {
-    if (!currentItemId) return;
-    
-    if (!confirm(`Are you sure you want to delete this ${currentItemType}?`)) {
-        return;
-    }
-    
-    if (currentItemType === 'process') {
-        bpm.deleteProcess(currentItemId);
-    } else if (currentItemType === 'system') {
-        bpm.deleteSystem(currentItemId);
-    } else if (currentItemType === 'vendor') {
-        bpm.deleteVendor(currentItemId);
-    }
-    
-    // Save data and update UI
-    saveDataToLocalStorage();
-    renderLists();
-    closeModal();
-    
-    // Reset selection if the deleted item was selected
-    if (selectedItemId === currentItemId && selectedItemType === currentItemType) {
-        selectedItemId = null;
-        selectedItemType = null;
-        currentViewState = {
-            id: null,
-            type: null,
-            parentId: null,
-            parentType: null
-        };
-        
-        const drillUpBtn = document.getElementById('drill-up-btn');
-        if (drillUpBtn) {
-            drillUpBtn.style.display = 'none';
-        }
-        
-        initializeVisualization(); // Reset visualization
-    } else if (selectedItemId) {
-        // Update visualization if another item is selected
-        updateVisualization(selectedItemId, selectedItemType);
-    }
-}
-
 // Add drill-up button to the header
 function addDrillUpButton() {
     const header = document.querySelector('header');
@@ -950,8 +307,8 @@ function drillUp() {
             parentType: null
         };
     } else {
-        // Go to top level view
-        initializeVisualization();
+        // Go to top level view - explicitly set to null to show all processes
+        updateVisualization(null, null);
         
         // Clear selection
         selectedItemId = null;
@@ -1003,13 +360,13 @@ function showDetailBox(itemId, itemType) {
     let html = '';
     
     if (itemType === 'process') {
-        const process = bpm.getProcess(itemId);
+        const process = data.processes.find(p => p.id === itemId);
         if (!process) return;
         
         html += `<h3>Process: ${process.name}</h3>`;
         
         // Get systems for this process
-        const systems = bpm.getSystemsForProcess(itemId);
+        const systems = data.systems.filter(s => process.systems.includes(s.id));
         html += '<div class="detail-section"><strong>Systems:</strong>';
         if (systems.length > 0) {
             html += '<ul>';
@@ -1023,7 +380,7 @@ function showDetailBox(itemId, itemType) {
         html += '</div>';
         
         // Get vendors for this process
-        const vendors = bpm.getVendorsForProcess(itemId);
+        const vendors = data.vendors.filter(v => process.vendors.includes(v.id));
         html += '<div class="detail-section"><strong>Vendors:</strong>';
         if (vendors.length > 0) {
             html += '<ul>';
@@ -1037,13 +394,13 @@ function showDetailBox(itemId, itemType) {
         html += '</div>';
     } 
     else if (itemType === 'system') {
-        const system = bpm.getSystem(itemId);
+        const system = data.systems.find(s => s.id === itemId);
         if (!system) return;
         
         html += `<h3>System: ${system.name}</h3>`;
         
         // Get processes for this system
-        const processes = bpm.getProcessesForSystem(itemId);
+        const processes = data.processes.filter(p => p.systems.includes(system.id));
         html += '<div class="detail-section"><strong>Processes:</strong>';
         if (processes.length > 0) {
             html += '<ul>';
@@ -1056,8 +413,15 @@ function showDetailBox(itemId, itemType) {
         }
         html += '</div>';
         
-        // Get vendors related to this system
-        const vendors = bpm.getVendorsForSystem(itemId);
+        // Get vendors related to this system (through processes)
+        const relatedVendorIds = new Set();
+        processes.forEach(process => {
+            process.vendors.forEach(vendorId => {
+                relatedVendorIds.add(vendorId);
+            });
+        });
+        
+        const vendors = data.vendors.filter(v => relatedVendorIds.has(v.id));
         html += '<div class="detail-section"><strong>Related Vendors:</strong>';
         if (vendors.length > 0) {
             html += '<ul>';
@@ -1071,13 +435,13 @@ function showDetailBox(itemId, itemType) {
         html += '</div>';
     }
     else if (itemType === 'vendor') {
-        const vendor = bpm.getVendor(itemId);
+        const vendor = data.vendors.find(v => v.id === itemId);
         if (!vendor) return;
         
         html += `<h3>Vendor: ${vendor.name}</h3>`;
         
         // Get processes for this vendor
-        const processes = bpm.getProcessesForVendor(itemId);
+        const processes = data.processes.filter(p => p.vendors.includes(vendor.id));
         html += '<div class="detail-section"><strong>Processes:</strong>';
         if (processes.length > 0) {
             html += '<ul>';
@@ -1090,8 +454,15 @@ function showDetailBox(itemId, itemType) {
         }
         html += '</div>';
         
-        // Get systems related to this vendor
-        const systems = bpm.getSystemsForVendor(itemId);
+        // Get systems related to this vendor (through processes)
+        const relatedSystemIds = new Set();
+        processes.forEach(process => {
+            process.systems.forEach(systemId => {
+                relatedSystemIds.add(systemId);
+            });
+        });
+        
+        const systems = data.systems.filter(s => relatedSystemIds.has(s.id));
         html += '<div class="detail-section"><strong>Related Systems:</strong>';
         if (systems.length > 0) {
             html += '<ul>';
@@ -1145,218 +516,51 @@ function initializeVisualization() {
     updateVisualization(null, null);
 }
 
-// Create hierarchical data structure for visualization
-function createHierarchicalData(focusId = null, focusType = null) {
-    let nodes = [];
-    let links = [];
-    
-    // Determine which processes to include
-    let processesToInclude = [];
-    if (focusId && focusType === 'process') {
-        processesToInclude = [bpm.getProcess(focusId)];
-    } else if (focusId && focusType === 'system') {
-        processesToInclude = bpm.getProcessesForSystem(focusId);
-    } else if (focusId && focusType === 'vendor') {
-        processesToInclude = bpm.getProcessesForVendor(focusId);
-    } else {
-        processesToInclude = bpm.processes;
-    }
-    
-    // Add processes to nodes
-    processesToInclude.forEach(process => {
-        if (!process) return; // Skip if process is undefined
-        
-        nodes.push({
-            id: process.id,
-            name: process.name,
-            type: 'process',
-            level: 1
-        });
-        
-        // Add systems for this process
-        const systems = bpm.getSystemsForProcess(process.id);
-        systems.forEach(system => {
-            // Check if system already exists in nodes
-            const existingSystem = nodes.find(node => node.id === system.id);
-            if (!existingSystem) {
-                nodes.push({
-                    id: system.id,
-                    name: system.name,
-                    type: 'system',
-                    level: 2
-                });
-            }
-            
-            // Add link from process to system
-            links.push({
-                source: process.id,
-                target: system.id
-            });
-            
-            // Add vendors for this process
-            const vendors = bpm.getVendorsForProcess(process.id);
-            vendors.forEach(vendor => {
-                // Check if vendor already exists in nodes
-                const existingVendor = nodes.find(node => node.id === vendor.id);
-                if (!existingVendor) {
-                    nodes.push({
-                        id: vendor.id,
-                        name: vendor.name,
-                        type: 'vendor',
-                        level: 3
-                    });
-                }
-                
-                // Add link from system to vendor
-                links.push({
-                    source: system.id,
-                    target: vendor.id
-                });
-            });
-        });
-    });
-    
-    return { nodes, links };
-}
-
 // Update visualization based on selected item
 function updateVisualization(id, type) {
+    console.log("Updating visualization", id, type);
+    
     // Clear previous visualization
     const visualizationElement = document.getElementById('visualization');
-    if (!visualizationElement) return;
+    if (!visualizationElement) {
+        console.error("Visualization container not found");
+        return;
+    }
     
     visualizationElement.innerHTML = '';
     
+    // Get container dimensions
     const width = visualizationElement.clientWidth || 800;
     const height = visualizationElement.clientHeight || 600;
     
+    console.log("Container dimensions:", width, height);
+    
+    // Create SVG
     const svg = d3.select('#visualization')
         .append('svg')
         .attr('width', width)
         .attr('height', height)
-        .call(d3.zoom().on('zoom', function(event) {
-            g.attr('transform', event.transform);
-        }));
+        .style('border', '1px solid #eee'); // Add border to see SVG boundaries
     
-    const g = svg.append('g')
-        .attr('transform', `translate(${width/2},50)`);
+    // Create a group for zoom/pan
+    const g = svg.append('g');
     
-    // Create hierarchical data
-    const graphData = createHierarchicalData(id, type);
+    // Add zoom behavior
+    svg.call(d3.zoom()
+        .extent([[0, 0], [width, height]])
+        .scaleExtent([0.1, 8])
+        .on("zoom", (event) => {
+            g.attr("transform", event.transform);
+        })
+    );
     
-    // Create a stratify layout
-    const stratify = d3.stratify()
-        .id(d => d.id)
-        .parentId(d => {
-            if (d.level === 1) return null; // Processes are top level
-            // Find parent based on links
-            const link = graphData.links.find(link => link.target === d.id);
-            return link ? link.source : null;
-        });
-    
-    // Apply stratify to create hierarchy
-    let root;
-    try {
-        // Convert flat nodes to hierarchical structure
-        const hierarchicalData = [];
-        graphData.nodes.forEach(node => {
-            hierarchicalData.push({
-                id: node.id,
-                name: node.name,
-                type: node.type,
-                level: node.level,
-                parentId: node.level === 1 ? null : graphData.links.find(link => link.target === node.id)?.source
-            });
-        });
-        
-        // Create root for tree layout
-        root = stratify(hierarchicalData);
-    } catch (e) {
-        console.error("Error creating hierarchy:", e);
-        // Fallback to simple force-directed layout
-        createForceDirectedLayout(g, graphData.nodes, graphData.links);
-        return;
-    }
-    
-    // Create tree layout
-    const treeLayout = d3.tree()
-        .size([width - 100, height - 150])
-        .nodeSize([180, 100]);
-    
-    // Apply layout
-    treeLayout(root);
-    
-    // Create links
-    const link = g.selectAll(".link")
-        .data(root.links())
-        .enter()
-        .append("path")
-        .attr("class", "link")
-        .attr("d", d3.linkVertical()
-            .x(d => d.x)
-            .y(d => d.y));
-    
-    // Create nodes
-    const node = g.selectAll(".node")
-        .data(root.descendants())
-        .enter()
-        .append("g")
-        .attr("class", d => `node ${d.data.type ? d.data.type + '-node' : ''}`)
-        .attr("transform", d => `translate(${d.x},${d.y})`)
-        .on("click", function(event, d) {
-            event.stopPropagation();
-            if (d.data.id) {
-                handleNodeClick(event, d);
-            }
-        });
-    
-    // Create nodes with different shapes based on type
-    node.each(function(d) {
-        const element = d3.select(this);
-        
-        if (d.data.type === 'process') {
-            // Create rectangle for processes
-            element.append("rect")
-                .attr("width", 160)
-                .attr("height", 60)
-                .attr("x", -80)
-                .attr("y", -30)
-                .attr("rx", 5)
-                .attr("ry", 5)
-                .attr("class", "process-node");
-        } else if (d.data.type === 'system') {
-            // Create rounded rectangle for systems
-            element.append("rect")
-                .attr("width", 140)
-                .attr("height", 40)
-                .attr("x", -70)
-                .attr("y", -20)
-                .attr("rx", 20)
-                .attr("ry", 20)
-                .attr("class", "system-node");
-        } else if (d.data.type === 'vendor') {
-            // Create circle for vendors
-            element.append("circle")
-                .attr("r", 15)
-                .attr("class", "vendor-node");
-        }
-        
-        // Add text labels
-        if (d.data.name) {
-            element.append("text")
-                .attr("dy", d.data.type === 'vendor' ? 30 : 5)
-                .attr("text-anchor", "middle")
-                .attr("class", "node-label")
-                .text(d.data.name);
-        }
-    });
+    // Create hierarchical layout
+    createForceDirectedLayout(g, id, type, width, height);
 }
 
-// Fallback to force-directed layout if tree layout fails
-// Replace the createForceDirectedLayout function in app.js with this improved version:
-
+// Create force-directed layout
 function createForceDirectedLayout(g, focusId, focusType, width, height) {
-    console.log("Creating hierarchical layout");
+    console.log("Creating hierarchical layout", focusId, focusType);
     
     // Prepare data based on focus
     let nodes = [];
@@ -1364,14 +568,16 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     
     // Determine which processes to include
     let processesToInclude = [];
-    if (focusId && focusType === 'process') {
-        processesToInclude = [data.processes.find(p => p.id === focusId)];
-    } else if (focusId && focusType === 'system') {
-        processesToInclude = data.processes.filter(p => p.systems.includes(focusId));
-    } else if (focusId && focusType === 'vendor') {
-        processesToInclude = data.processes.filter(p => p.vendors.includes(focusId));
-    } else {
+    if (focusId === null || focusType === null) {
+        // Show all processes for the initial view
         processesToInclude = data.processes;
+        console.log("Showing all processes", processesToInclude.length);
+    } else if (focusType === 'process') {
+        processesToInclude = [data.processes.find(p => p.id === focusId)];
+    } else if (focusType === 'system') {
+        processesToInclude = data.processes.filter(p => p.systems.includes(focusId));
+    } else if (focusType === 'vendor') {
+        processesToInclude = data.processes.filter(p => p.vendors.includes(focusId));
     }
     
     console.log("Processes to include:", processesToInclude.length);
@@ -1573,27 +779,155 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     }
 }
 
+// Add popup for node when clicked
+function showPopupForNode(d, event) {
+    // Remove any existing popup
+    d3.select('#node-popup').remove();
+    
+    // Create popup container
+    const popup = d3.select('body')
+        .append('div')
+        .attr('id', 'node-popup')
+        .style('position', 'absolute')
+        .style('left', (event.pageX + 10) + 'px')
+        .style('top', (event.pageY + 10) + 'px')
+        .style('background-color', 'white')
+        .style('border', '1px solid #ccc')
+        .style('border-radius', '5px')
+        .style('padding', '10px')
+        .style('box-shadow', '0 2px 10px rgba(0,0,0,0.2)')
+        .style('z-index', '1000')
+        .style('max-width', '300px');
+    
+    // Add close button
+    popup.append('div')
+        .style('text-align', 'right')
+        .style('margin-bottom', '5px')
+        .append('span')
+        .style('cursor', 'pointer')
+        .style('font-weight', 'bold')
+        .text('×')
+        .on('click', () => {
+            d3.select('#node-popup').remove();
+        });
+    
+    // Add title
+    popup.append('h3')
+        .style('margin', '0 0 10px 0')
+        .style('color', '#2c3e50')
+        .style('border-bottom', '1px solid #eee')
+        .style('padding-bottom', '5px')
+        .text(`${capitalize(d.type)}: ${d.name}`);
+    
+    // Add content based on node type
+    if (d.type === 'process') {
+        const process = data.processes.find(p => p.id === d.id);
+        if (!process) return;
+        
+        // Get systems for this process
+        const systems = data.systems.filter(s => process.systems.includes(s.id));
+        popup.append('div')
+            .attr('class', 'popup-section')
+            .html(`<strong>Systems:</strong> ${systems.length > 0 ? 
+                systems.map(s => s.name).join(', ') : 
+                'No systems linked'}`);
+        
+        // Get vendors for this process
+        const vendors = data.vendors.filter(v => process.vendors.includes(v.id));
+        popup.append('div')
+            .attr('class', 'popup-section')
+            .html(`<strong>Vendors:</strong> ${vendors.length > 0 ? 
+                vendors.map(v => v.name).join(', ') : 
+                'No vendors linked'}`);
+    } 
+    else if (d.type === 'system') {
+        const system = data.systems.find(s => s.id === d.id);
+        if (!system) return;
+        
+        // Get processes for this system
+        const processes = data.processes.filter(p => p.systems.includes(system.id));
+        popup.append('div')
+            .attr('class', 'popup-section')
+            .html(`<strong>Processes:</strong> ${processes.length > 0 ? 
+                processes.map(p => p.name).join(', ') : 
+                'No processes linked'}`);
+        
+        // Get vendors related to this system (through processes)
+        const relatedVendorIds = new Set();
+        processes.forEach(process => {
+            process.vendors.forEach(vendorId => {
+                relatedVendorIds.add(vendorId);
+            });
+        });
+        
+        const vendors = data.vendors.filter(v => relatedVendorIds.has(v.id));
+        popup.append('div')
+            .attr('class', 'popup-section')
+            .html(`<strong>Related Vendors:</strong> ${vendors.length > 0 ? 
+                vendors.map(v => v.name).join(', ') : 
+                'No vendors related'}`);
+    }
+    else if (d.type === 'vendor') {
+        const vendor = data.vendors.find(v => v.id === d.id);
+        if (!vendor) return;
+        
+        // Get processes for this vendor
+        const processes = data.processes.filter(p => p.vendors.includes(vendor.id));
+        popup.append('div')
+            .attr('class', 'popup-section')
+            .html(`<strong>Processes:</strong> ${processes.length > 0 ? 
+                processes.map(p => p.name).join(', ') : 
+                'No processes linked'}`);
+        
+        // Get systems related to this vendor (through processes)
+        const relatedSystemIds = new Set();
+        processes.forEach(process => {
+            process.systems.forEach(systemId => {
+                relatedSystemIds.add(systemId);
+            });
+        });
+        
+        const systems = data.systems.filter(s => relatedSystemIds.has(s.id));
+        popup.append('div')
+            .attr('class', 'popup-section')
+            .html(`<strong>Related Systems:</strong> ${systems.length > 0 ? 
+                systems.map(s => s.name).join(', ') : 
+                'No systems related'}`);
+    }
+    
+    // Add click outside to close
+    d3.select('body').on('click.popup', function(event) {
+        if (event.target.id !== 'node-popup' && 
+            !d3.select(event.target).classed('node') &&
+            !document.getElementById('node-popup').contains(event.target)) {
+            d3.select('#node-popup').remove();
+            d3.select('body').on('click.popup', null); // Remove this event listener
+        }
+    });
+}
+
 // Handle node click for drill down
 function handleNodeClick(event, d) {
     event.stopPropagation();
+    console.log("Node clicked", d);
     
-    // Skip if it doesn't have an ID
-    if (!d.data.id) return;
+    // Show popup for this node
+    showPopupForNode(d, event);
     
     // Store previous state for drill-up
     const previousState = {...currentViewState};
     
     // Update current view state
     currentViewState = {
-        id: d.data.id,
-        type: d.data.type,
+        id: d.id,
+        type: d.type,
         parentId: previousState.id,
         parentType: previousState.type
     };
     
     // Update selection in the sidebar
-    selectedItemId = d.data.id;
-    selectedItemType = d.data.type;
+    selectedItemId = d.id;
+    selectedItemType = d.type;
     
     document.querySelectorAll('.item').forEach(item => {
         item.classList.remove('active');
@@ -1605,16 +939,324 @@ function handleNodeClick(event, d) {
     }
     
     // Update visualization with new focus
-    updateVisualization(d.data.id, d.data.type);
+    updateVisualization(d.id, d.type);
     
     // Show detail box
-    showDetailBox(d.data.id, d.data.type);
+    showDetailBox(d.id, d.type);
     
     // Show drill-up button
     const drillUpBtn = document.getElementById('drill-up-btn');
     if (drillUpBtn) {
         drillUpBtn.style.display = 'block';
     }
+}
+
+// Open modal for adding a new item
+function openAddModal(type) {
+    currentItemType = type;
+    currentItemId = null;
+    
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = `Add New ${capitalize(type)}`;
+    }
+    
+    const nameInput = document.getElementById('item-name');
+    if (nameInput) {
+        nameInput.value = '';
+    }
+    
+    const deleteBtn = document.getElementById('delete-item');
+    if (deleteBtn) {
+        deleteBtn.style.display = 'none';
+    }
+    
+    // Show/hide process-specific fields
+    const processFields = document.getElementById('process-specific-fields');
+    if (processFields) {
+        if (type === 'process') {
+            processFields.style.display = 'block';
+            populateCheckboxes();
+        } else {
+            processFields.style.display = 'none';
+        }
+    }
+    
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// Open modal for editing an existing item
+function openEditModal(type, id) {
+    currentItemType = type;
+    currentItemId = id;
+    
+    const modalTitle = document.getElementById('modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = `Edit ${capitalize(type)}`;
+    }
+    
+    let item;
+    const nameInput = document.getElementById('item-name');
+    const processFields = document.getElementById('process-specific-fields');
+    
+    if (type === 'process') {
+        item = data.processes.find(p => p.id === id);
+        if (nameInput) nameInput.value = item.name;
+        if (processFields) processFields.style.display = 'block';
+        populateCheckboxes(item);
+    } else if (type === 'system') {
+        item = data.systems.find(s => s.id === id);
+        if (nameInput) nameInput.value = item.name;
+        if (processFields) processFields.style.display = 'none';
+    } else if (type === 'vendor') {
+        item = data.vendors.find(v => v.id === id);
+        if (nameInput) nameInput.value = item.name;
+        if (processFields) processFields.style.display = 'none';
+    }
+    
+    const deleteBtn = document.getElementById('delete-item');
+    if (deleteBtn) {
+        deleteBtn.style.display = 'block';
+    }
+    
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'block';
+    }
+}
+
+// Close the modal
+function closeModal() {
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Populate checkboxes for systems and vendors
+function populateCheckboxes(process = null) {
+    const systemsCheckboxes = document.getElementById('systems-checkboxes');
+    const vendorsCheckboxes = document.getElementById('vendors-checkboxes');
+    
+    if (!systemsCheckboxes || !vendorsCheckboxes) return;
+    
+    systemsCheckboxes.innerHTML = '';
+    vendorsCheckboxes.innerHTML = '';
+    
+    // Add system checkboxes
+    data.systems.forEach(system => {
+        const checkboxItem = document.createElement('div');
+        checkboxItem.className = 'checkbox-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `system-${system.id}`;
+        checkbox.value = system.id;
+        
+        // Check if this system is related to the process
+        if (process && process.systems.includes(system.id)) {
+            checkbox.checked = true;
+        }
+        
+        const label = document.createElement('label');
+        label.htmlFor = `system-${system.id}`;
+        label.textContent = system.name;
+        
+        checkboxItem.appendChild(checkbox);
+        checkboxItem.appendChild(label);
+        systemsCheckboxes.appendChild(checkboxItem);
+    });
+    
+    // Add vendor checkboxes
+    data.vendors.forEach(vendor => {
+        const checkboxItem = document.createElement('div');
+        checkboxItem.className = 'checkbox-item';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `vendor-${vendor.id}`;
+        checkbox.value = vendor.id;
+        
+        // Check if this vendor is related to the process
+        if (process && process.vendors.includes(vendor.id)) {
+            checkbox.checked = true;
+        }
+        
+        const label = document.createElement('label');
+        label.htmlFor = `vendor-${vendor.id}`;
+        label.textContent = vendor.name;
+        
+        checkboxItem.appendChild(checkbox);
+        checkboxItem.appendChild(label);
+        vendorsCheckboxes.appendChild(checkboxItem);
+    });
+}
+
+// Save the current item
+function saveItem() {
+    const nameInput = document.getElementById('item-name');
+    if (!nameInput) return;
+    
+    const name = nameInput.value.trim();
+    
+    if (!name) {
+        alert('Please enter a name');
+        return;
+    }
+    
+    if (currentItemType === 'process') {
+        // Get selected systems
+        const selectedSystems = Array.from(document.querySelectorAll('#systems-checkboxes input:checked'))
+            .map(checkbox => checkbox.value);
+        
+        // Get selected vendors
+        const selectedVendors = Array.from(document.querySelectorAll('#vendors-checkboxes input:checked'))
+            .map(checkbox => checkbox.value);
+        
+        if (currentItemId) {
+            // Update existing process
+            const processIndex = data.processes.findIndex(p => p.id === currentItemId);
+            if (processIndex !== -1) {
+                data.processes[processIndex] = {
+                    id: currentItemId,
+                    name: name,
+                    systems: selectedSystems,
+                    vendors: selectedVendors
+                };
+            }
+        } else {
+            // Add new process
+            const newId = generateId('process');
+            data.processes.push({
+                id: newId,
+                name: name,
+                systems: selectedSystems,
+                vendors: selectedVendors
+            });
+        }
+    } else if (currentItemType === 'system') {
+        if (currentItemId) {
+            // Update existing system
+            const systemIndex = data.systems.findIndex(s => s.id === currentItemId);
+            if (systemIndex !== -1) {
+                data.systems[systemIndex] = {
+                    id: currentItemId,
+                    name: name
+                };
+            }
+        } else {
+            // Add new system
+            const newId = generateId('system');
+            data.systems.push({
+                id: newId,
+                name: name
+            });
+        }
+    } else if (currentItemType === 'vendor') {
+        if (currentItemId) {
+            // Update existing vendor
+            const vendorIndex = data.vendors.findIndex(v => v.id === currentItemId);
+            if (vendorIndex !== -1) {
+                data.vendors[vendorIndex] = {
+                    id: currentItemId,
+                    name: name
+                };
+            }
+        } else {
+            // Add new vendor
+            const newId = generateId('vendor');
+            data.vendors.push({
+                id: newId,
+                name: name
+            });
+        }
+    }
+    
+    // Save data and update UI
+    saveDataToLocalStorage();
+    renderLists();
+    closeModal();
+    
+    // Update visualization if needed
+    if (selectedItemId) {
+        updateVisualization(selectedItemId, selectedItemType);
+    } else {
+        initializeVisualization();
+    }
+}
+
+// Delete the current item
+function deleteItem() {
+    if (!currentItemId) return;
+    
+    if (!confirm(`Are you sure you want to delete this ${currentItemType}?`)) {
+        return;
+    }
+    
+    if (currentItemType === 'process') {
+        data.processes = data.processes.filter(p => p.id !== currentItemId);
+    } else if (currentItemType === 'system') {
+        data.systems = data.systems.filter(s => s.id !== currentItemId);
+        
+        // Remove references to this system from processes
+        data.processes.forEach(process => {
+            process.systems = process.systems.filter(id => id !== currentItemId);
+        });
+    } else if (currentItemType === 'vendor') {
+        data.vendors = data.vendors.filter(v => v.id !== currentItemId);
+        
+        // Remove references to this vendor from processes
+        data.processes.forEach(process => {
+            process.vendors = process.vendors.filter(id => id !== currentItemId);
+        });
+    }
+    
+    // Save data and update UI
+    saveDataToLocalStorage();
+    renderLists();
+    closeModal();
+    
+    // Reset selection if the deleted item was selected
+    if (selectedItemId === currentItemId && selectedItemType === currentItemType) {
+        selectedItemId = null;
+        selectedItemType = null;
+        currentViewState = {
+            id: null,
+            type: null,
+            parentId: null,
+            parentType: null
+        };
+        
+        const drillUpBtn = document.getElementById('drill-up-btn');
+        if (drillUpBtn) {
+            drillUpBtn.style.display = 'none';
+        }
+        
+        initializeVisualization(); // Reset visualization
+    } else if (selectedItemId) {
+        // Update visualization if another item is selected
+        updateVisualization(selectedItemId, selectedItemType);
+    }
+}
+
+// Generate a unique ID for a new item
+function generateId(type) {
+    const prefix = type === 'process' ? 'p' : type === 'system' ? 's' : 'v';
+    const items = type === 'process' ? data.processes : 
+                 type === 'system' ? data.systems : data.vendors;
+    
+    let maxNum = 0;
+    items.forEach(item => {
+        const idNum = parseInt(item.id.substring(1));
+        if (idNum > maxNum) {
+            maxNum = idNum;
+        }
+    });
+    
+    return `${prefix}${maxNum + 1}`;
 }
 
 // Capitalize the first letter of a string
