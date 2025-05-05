@@ -220,7 +220,7 @@ function resetVisualization() {
     selectedItemType = null;
     currentViewState = { id: null, type: null, parentId: null, parentType: null };
     document.querySelectorAll('.item').forEach(item => item.classList.remove('active'));
-    updateVisualization(null, null, true);
+    updateVisualization('all', 'all-process', true);
     const detailBox = document.getElementById('detail-box');
     if (detailBox) detailBox.style.display = 'none';
     const drillUpBtn = document.getElementById('drill-up-btn');
@@ -259,8 +259,14 @@ function updateVisualization(id, type, resetZoom = false) {
 
 function createHierarchyLayout(g, focusId, focusType, width, height) {
     let nodes = [], links = [];
-    // --- Default view: show all hierarchy ---
-    if (focusId === null && focusType === null) {
+    // Always treat null, 'all', or 'all-process' as the "All Process" overview
+    const isAllProcessView =
+        focusId === null ||
+        focusId === 'all' ||
+        focusType === null ||
+        focusType === 'all-process';
+
+    if (isAllProcessView) {
         nodes.push({ id: 'all', name: 'All Process', type: 'all-process', level: 0 });
         data.processes.forEach(process => {
             nodes.push({ id: process.id, name: process.name, type: 'process', level: 1 });
@@ -285,8 +291,7 @@ function createHierarchyLayout(g, focusId, focusType, width, height) {
             });
         });
     } else {
-        // (Your drill-down logic here, similar to before)
-        // ... (Omitted for brevity, but you can use your previous logic for drill-down)
+        // (Optional: drill-down logic for other focus, as before)
     }
 
     // Fixed positioning by type
@@ -459,6 +464,12 @@ function setupToggleVisibility() {
 
 function handleNodeClick(event, d) {
     event.stopPropagation();
+    if (d.type === 'all-process' || d.id === 'all') {
+        updateVisualization('all', 'all-process');
+        const drillUpBtn = document.getElementById('drill-up-btn');
+        if (drillUpBtn) drillUpBtn.style.display = 'none';
+        return;
+    }
     if (d.type !== 'all-process') {
         showPopupForNode(d, event);
     }
