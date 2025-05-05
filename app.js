@@ -566,12 +566,29 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     let nodes = [];
     let links = [];
     
+    // Add "All Process" node at rank 0 if showing all processes
+    if (focusId === null || focusType === null) {
+        nodes.push({
+            id: 'all',
+            name: 'All Process',
+            type: 'all-process',
+            level: 0,
+            x: width / 2,
+            y: 50,
+            fx: width / 2, // Fixed X position
+            fy: 50  // Fixed Y position
+        });
+    }
+    
     // Determine which processes to include
     let processesToInclude = [];
     if (focusId === null || focusType === null) {
         // Show all processes for the initial view
         processesToInclude = data.processes;
         console.log("Showing all processes", processesToInclude.length);
+    } else if (focusId === 'all') {
+        // Show all processes when "All Process" is selected
+        processesToInclude = data.processes;
     } else if (focusType === 'process') {
         processesToInclude = [data.processes.find(p => p.id === focusId)];
     } else if (focusType === 'system') {
@@ -586,9 +603,9 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     processesToInclude.forEach((process, index) => {
         if (!process) return; // Skip if process is undefined
         
-        // Position processes in a row at the top
+        // Position processes in a row at the second level
         const processX = width * (index + 1) / (processesToInclude.length + 1);
-        const processY = 100;
+        const processY = 150; // Moved down to make room for "All Process"
         
         nodes.push({
             id: process.id,
@@ -601,6 +618,14 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
             fy: processY  // Fixed Y position
         });
         
+        // Add link from "All Process" to this process if showing all processes
+        if ((focusId === null || focusType === null || focusId === 'all') && nodes.find(n => n.id === 'all')) {
+            links.push({
+                source: 'all',
+                target: process.id
+            });
+        }
+        
         // Add systems for this process
         const systemsForProcess = process.systems.map(sId => data.systems.find(s => s.id === sId)).filter(s => s);
         
@@ -611,7 +636,7 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
             if (!existingSystem) {
                 // Position systems in the middle row
                 const systemX = processX - 100 + (sysIndex * 200 / systemsForProcess.length);
-                const systemY = 250;
+                const systemY = 300; // Moved down to make room for processes
                 
                 existingSystem = {
                     id: system.id,
@@ -641,7 +666,7 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
                 if (!existingVendor) {
                     // Position vendors at the bottom
                     const vendorX = existingSystem.x - 50 + (vendorIndex * 100 / vendorsForProcess.length);
-                    const vendorY = 400;
+                    const vendorY = 450; // Moved down to make room for systems
                     
                     existingVendor = {
                         id: vendor.id,
@@ -708,7 +733,19 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     node.each(function(d) {
         const element = d3.select(this);
         
-        if (d.type === 'process') {
+        if (d.type === 'all-process') {
+            // Create special shape for "All Process"
+            element.append("rect")
+                .attr("width", 180)
+                .attr("height", 70)
+                .attr("x", -90)
+                .attr("y", -35)
+                .attr("rx", 10)
+                .attr("ry", 10)
+                .attr("fill", "#ff9800")
+                .attr("stroke", "#e65100")
+                .attr("stroke-width", 2);
+        } else if (d.type === 'process') {
             // Create rectangle for processes
             element.append("rect")
                 .attr("width", 160)
@@ -740,6 +777,8 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
             .attr("dy", d.type === 'vendor' ? 30 : 5)
             .attr("text-anchor", "middle")
             .attr("class", "node-label")
+            .attr("fill", d.type === 'all-process' ? "white" : "black")
+            .attr("font-weight", d.type === 'all-process' ? "bold" : "normal")
             .text(d.name);
     });
     
@@ -771,8 +810,8 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     
     function dragended(event, d) {
         if (!event.active) simulation.alphaTarget(0);
-        // Only keep fixed positions for processes
-        if (d.type !== 'process') {
+        // Only keep fixed positions for processes and all-process
+        if (d.type !== 'process' && d.type !== 'all-process') {
             d.fx = null;
             d.fy = null;
         }
@@ -911,8 +950,10 @@ function handleNodeClick(event, d) {
     event.stopPropagation();
     console.log("Node clicked", d);
     
-    // Show popup for this node
-    showPopupForNode(d, event);
+    // Show popup for this node (except for All Process)
+    if (d.type !== 'all-process') {
+        showPopupForNode(d, event);
+    }
     
     // Store previous state for drill-up
     const previousState = {...currentViewState};
@@ -925,29 +966,45 @@ function handleNodeClick(event, d) {
         parentType: previousState.type
     };
     
-    // Update selection in the sidebar
-    selectedItemId = d.id;
-    selectedItemType = d.type;
-    
-    document.querySelectorAll('.item').forEach(item => {
-        item.classList.remove('active');
-    });
-    
-    const selectedElement = document.querySelector(`.item[data-id="${selectedItemId}"][data-type="${selectedItemType}"]`);
-    if (selectedElement) {
-        selectedElement.classList.add('active');
+    // Update selection in the sidebar (except for All Process)
+    if (d.type !== 'all-process') {
+        selectedItemId = d.id;
+        selectedItemType = d.type;
+        
+        document.querySelectorAll('.item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        const selectedElement = document.querySelector(`.item[data-id="${selectedItemId}"][data-type="${selectedItemType}"]`);
+        if (selectedElement) {
+            selectedElement.classList.add('active');
+        }
+        
+        // Show detail box
+        showDetailBox(d.id, d.type);
+    } else {
+        // For All Process, just clear the selection
+        selectedItemId = null;
+        selectedItemType = null;
+        
+        document.querySelectorAll('.item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Hide detail box
+        const detailBox = document.getElementById('detail-box');
+        if (detailBox) {
+            detailBox.style.display = 'none';
+        }
     }
     
     // Update visualization with new focus
     updateVisualization(d.id, d.type);
     
-    // Show detail box
-    showDetailBox(d.id, d.type);
-    
-    // Show drill-up button
+    // Show drill-up button if we're not at the top level
     const drillUpBtn = document.getElementById('drill-up-btn');
     if (drillUpBtn) {
-        drillUpBtn.style.display = 'block';
+        drillUpBtn.style.display = d.type !== 'all-process' ? 'block' : 'none';
     }
 }
 
