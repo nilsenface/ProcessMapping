@@ -1064,9 +1064,6 @@ function handleNodeClick(event, d) {
         if (selectedElement) {
             selectedElement.classList.add('active');
         }
-        
-        // Show detail box
-        showDetailBox(d.id, d.type);
     } else {
         // For All Process, just clear the selection
         selectedItemId = null;
