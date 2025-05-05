@@ -1,4 +1,4 @@
-// Business Process Manager Class for efficient relationship management
+// Business Process Manager Class for efficient relationship management.
 class BusinessProcessManager {
     constructor(initialData = null) {
         this.processes = [];
