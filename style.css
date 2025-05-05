@@ -10,17 +10,12 @@
     --radius: 8px;
 }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
 body {
     background-color: var(--light);
     color: var(--text);
-    line-height: 1.6;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    min-height: 100vh;
 }
 
 header {
@@ -35,6 +30,7 @@ header {
 
 h1 {
     font-size: 1.8rem;
+    margin: 0;
 }
 
 .control-btn {
@@ -48,12 +44,12 @@ h1 {
     transition: background-color 0.3s;
 }
 
-.control-btn:hover {
-    background-color: #2980b9;
-}
-
 .control-btn.active {
     background-color: var(--danger);
+}
+
+.control-btn:hover {
+    background-color: #2980b9;
 }
 
 .container {
@@ -81,6 +77,7 @@ h1 {
 .section-header h2 {
     font-size: 1.2rem;
     color: var(--dark);
+    margin: 0;
 }
 
 .add-btn {
@@ -130,17 +127,9 @@ h1 {
     border-left-color: var(--primary);
 }
 
-.item.process {
-    border-left-color: var(--primary);
-}
-
-.item.system {
-    border-left-color: var(--secondary);
-}
-
-.item.vendor {
-    border-left-color: var(--accent);
-}
+.item.process { border-left-color: var(--primary); }
+.item.system { border-left-color: var(--secondary); }
+.item.vendor { border-left-color: var(--accent); }
 
 .edit-btn {
     background-color: var(--accent);
@@ -165,12 +154,18 @@ h1 {
     margin: 1rem;
     border-radius: var(--radius);
     box-shadow: var(--shadow);
+    min-width: 350px;
+    min-height: 600px;
+    position: relative;
 }
 
 #visualization {
     width: 100%;
     height: 100%;
+    min-height: 500px;
+    min-width: 320px;
     overflow: hidden;
+    position: relative;
 }
 
 /* Modal styles */
@@ -261,85 +256,66 @@ h1 {
 }
 
 /* D3.js visualization styles */
-.node {
-    cursor: pointer;
-}
-
-.node circle {
+.process-node rect {
+    fill: #3498db;
+    stroke: #2980b9;
     stroke-width: 2px;
 }
-
-.node text {
-    font-size: 12px;
-    font-weight: bold;
+.system-node rect {
+    fill: #2ecc71;
+    stroke: #27ae60;
+    stroke-width: 2px;
 }
-
+.vendor-node circle {
+    fill: #f39c12;
+    stroke: #e67e22;
+    stroke-width: 2px;
+}
 .link {
     fill: none;
-    stroke: #999;
-    stroke-opacity: 0.6;
-    stroke-width: 2px;
+    stroke: #95a5a6;
+    stroke-width: 1.5px;
+}
+.node-label {
+    font-size: 12px;
+    font-weight: bold;
+    pointer-events: none;
+}
+#drill-up-btn {
+    background-color: #34495e;
+    margin-left: 10px;
+    color: #fff;
+}
+#detail-box {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    max-width: 300px;
+    max-height: 400px;
+    overflow-y: auto;
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 14px;
+    color: #333;
 }
 
-.process-node circle {
-    fill: var(--primary);
-    stroke: #2980b9;
-}
-
-.system-node circle {
-    fill: var(--secondary);
-    stroke: #27ae60;
-}
-
-.vendor-node circle {
-    fill: var(--accent);
-    stroke: #d35400;
-}
-
-@media (max-width: 768px) {
+/* Responsive */
+@media (max-width: 900px) {
     .container {
         flex-direction: column;
         height: auto;
     }
-    
     .sidebar {
         width: 100%;
         max-height: 300px;
     }
-    
     .visualization-container {
-        height: 500px;
+        margin: 0;
+        min-height: 400px;
     }
 }
-/* Node shapes */
-.process-node rect {
-  fill: #3498db;
-  stroke: #2980b9;
-  stroke-width: 2px;
-}
-
-.system-node rect {
-  fill: #2ecc71;
-  stroke: #27ae60;
-  stroke-width: 2px;
-}
-
-.vendor-node circle {
-  fill: #f39c12;
-  stroke: #e67e22;
-  stroke-width: 2px;
-}
-
-/* Links between hierarchy levels */
-.link {
-  fill: none;
-  stroke: #95a5a6;
-  stroke-width: 1.5px;
-}
-
-/* Drill-up button */
-#drill-up-btn {
-  background-color: #34495e;
-  margin-left: 10px;
-}
-
