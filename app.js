@@ -558,7 +558,7 @@ function updateVisualization(id, type) {
     createForceDirectedLayout(g, id, type, width, height);
 }
 
-// Create force-directed layout
+// Create force-directed layout with improved fixed positioning
 function createForceDirectedLayout(g, focusId, focusType, width, height) {
     console.log("Creating hierarchical layout", focusId, focusType);
     
@@ -572,11 +572,7 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
             id: 'all',
             name: 'All Process',
             type: 'all-process',
-            level: 0,
-            x: width / 2,
-            y: 50,
-            fx: width / 2, // Fixed X position
-            fy: 50  // Fixed Y position
+            level: 0
         });
     }
     
@@ -600,22 +596,14 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     console.log("Processes to include:", processesToInclude.length);
     
     // Add processes to nodes
-    processesToInclude.forEach((process, index) => {
+    processesToInclude.forEach(process => {
         if (!process) return; // Skip if process is undefined
-        
-        // Position processes in a row at the second level
-        const processX = width * (index + 1) / (processesToInclude.length + 1);
-        const processY = 150; // Moved down to make room for "All Process"
         
         nodes.push({
             id: process.id,
             name: process.name,
             type: 'process',
-            level: 1,
-            x: processX,
-            y: processY,
-            fx: processX, // Fixed X position
-            fy: processY  // Fixed Y position
+            level: 1
         });
         
         // Add link from "All Process" to this process if showing all processes
@@ -629,22 +617,16 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
         // Add systems for this process
         const systemsForProcess = process.systems.map(sId => data.systems.find(s => s.id === sId)).filter(s => s);
         
-        systemsForProcess.forEach((system, sysIndex) => {
+        systemsForProcess.forEach(system => {
             // Check if system already exists in nodes
             let existingSystem = nodes.find(node => node.id === system.id);
             
             if (!existingSystem) {
-                // Position systems in the middle row
-                const systemX = processX - 100 + (sysIndex * 200 / systemsForProcess.length);
-                const systemY = 300; // Moved down to make room for processes
-                
                 existingSystem = {
                     id: system.id,
                     name: system.name,
                     type: 'system',
-                    level: 2,
-                    x: systemX,
-                    y: systemY
+                    level: 2
                 };
                 
                 nodes.push(existingSystem);
@@ -659,22 +641,16 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
             // Add vendors for this process
             const vendorsForProcess = process.vendors.map(vId => data.vendors.find(v => v.id === vId)).filter(v => v);
             
-            vendorsForProcess.forEach((vendor, vendorIndex) => {
+            vendorsForProcess.forEach(vendor => {
                 // Check if vendor already exists in nodes
                 let existingVendor = nodes.find(node => node.id === vendor.id);
                 
                 if (!existingVendor) {
-                    // Position vendors at the bottom
-                    const vendorX = existingSystem.x - 50 + (vendorIndex * 100 / vendorsForProcess.length);
-                    const vendorY = 450; // Moved down to make room for systems
-                    
                     existingVendor = {
                         id: vendor.id,
                         name: vendor.name,
                         type: 'vendor',
-                        level: 3,
-                        x: vendorX,
-                        y: vendorY
+                        level: 3
                     };
                     
                     nodes.push(existingVendor);
@@ -696,12 +672,40 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
         return;
     }
     
+    // Separate nodes by type for fixed positioning
+    const processNodes = nodes.filter(node => node.type === 'process');
+    const systemNodes = nodes.filter(node => node.type === 'system');
+    const vendorNodes = nodes.filter(node => node.type === 'vendor');
+    const allProcessNode = nodes.find(node => node.type === 'all-process');
+    
+    // Fix "All Process" node at the top center
+    if (allProcessNode) {
+        allProcessNode.fx = width / 2;
+        allProcessNode.fy = 50;
+    }
+    
+    // Position processes evenly in a row (rank 1)
+    processNodes.forEach((node, index) => {
+        node.fx = width * (index + 1) / (processNodes.length + 1);
+        node.fy = 150; // Fixed Y for processes
+    });
+    
+    // Position systems evenly in a row (rank 2)
+    systemNodes.forEach((node, index) => {
+        node.fx = width * (index + 1) / (systemNodes.length + 1);
+        node.fy = 300; // Fixed Y for systems
+    });
+    
+    // Position vendors evenly in a row (rank 3)
+    vendorNodes.forEach((node, index) => {
+        node.fx = width * (index + 1) / (vendorNodes.length + 1);
+        node.fy = 450; // Fixed Y for vendors
+    });
+    
     // Create a simulation with very weak forces (mostly for fine adjustments)
     const simulation = d3.forceSimulation(nodes)
         .force("link", d3.forceLink(links).id(d => d.id).distance(100))
-        .force("charge", d3.forceManyBody().strength(-50)) // Weak repulsion
-        .force("x", d3.forceX().x(d => d.x).strength(0.5)) // Strong pull to initial x
-        .force("y", d3.forceY().y(d => d.y).strength(0.5)) // Strong pull to initial y
+        .force("charge", d3.forceManyBody().strength(-30)) // Weaker repulsion
         .force("collide", d3.forceCollide().radius(60)); // Prevent overlap
     
     // Create links
@@ -810,11 +814,9 @@ function createForceDirectedLayout(g, focusId, focusType, width, height) {
     
     function dragended(event, d) {
         if (!event.active) simulation.alphaTarget(0);
-        // Only keep fixed positions for processes and all-process
-        if (d.type !== 'process' && d.type !== 'all-process') {
-            d.fx = null;
-            d.fy = null;
-        }
+        // Keep fixed positions for all nodes after dragging
+        d.fx = d.x;
+        d.fy = d.y;
     }
 }
 
