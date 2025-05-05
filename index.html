@@ -1,69 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Business Process Visualization</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Process Visualization</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Business Process Visualization</h1>
-    <p>Click on any process, system, or provider to explore dependencies.<br>
-      <button id="admin-toggle" class="admin-btn">Admin Mode</button>
-    </p>
-  </header>
-  <main>
-    <section class="card">
-      <div class="section-header">
-        <h2>Business Processes</h2>
-        <button id="add-process" class="add-btn" style="display:none;">＋</button>
-      </div>
-      <div id="processes-container" class="item-list"></div>
-    </section>
-    <section class="card">
-      <div class="section-header">
-        <h2>Systems</h2>
-        <button id="add-system" class="add-btn" style="display:none;">＋</button>
-      </div>
-      <div id="systems-container" class="item-list"></div>
-    </section>
-    <section class="card">
-      <div class="section-header">
-        <h2>Third-Party Providers</h2>
-        <button id="add-provider" class="add-btn" style="display:none;">＋</button>
-      </div>
-      <div id="providers-container" class="item-list"></div>
-    </section>
-  </main>
+    <header>
+        <h1>Business Process Visualization</h1>
+        <button id="admin-toggle" class="control-btn">Admin Mode</button>
+    </header>
 
-  <!-- Modal for Add/Edit -->
-  <div id="modal" class="modal">
-    <div class="modal-content">
-      <span class="close">&times;</span>
-      <h3 id="modal-title">Add/Edit</h3>
-      <form id="item-form">
-        <label>
-          Name:
-          <input type="text" id="item-name" required />
-        </label>
-        <div id="process-fields" style="display:none;">
-          <label>Systems:</label>
-          <div id="systems-checkboxes" class="checkbox-group"></div>
-          <label>Providers:</label>
-          <div id="providers-checkboxes" class="checkbox-group"></div>
+    <main>
+        <div class="container">
+            <div class="sidebar">
+                <div class="section-header">
+                    <h2>Business Processes</h2>
+                    <button id="add-process" class="add-btn" style="display:none;">+</button>
+                </div>
+                <div id="process-list" class="item-list"></div>
+
+                <div class="section-header">
+                    <h2>Systems</h2>
+                    <button id="add-system" class="add-btn" style="display:none;">+</button>
+                </div>
+                <div id="system-list" class="item-list"></div>
+
+                <div class="section-header">
+                    <h2>Vendors</h2>
+                    <button id="add-vendor" class="add-btn" style="display:none;">+</button>
+                </div>
+                <div id="vendor-list" class="item-list"></div>
+            </div>
+
+            <div class="visualization-container">
+                <div id="visualization"></div>
+            </div>
         </div>
-        <div class="modal-actions">
-          <button type="submit" id="save-item" class="modal-save">Save</button>
-          <button type="button" id="delete-item" class="modal-delete" style="display:none;">Delete</button>
+    </main>
+
+    <!-- Modal for adding/editing items -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modal-title">Add/Edit Item</h3>
+            <form id="item-form">
+                <div class="form-group">
+                    <label for="item-name">Name:</label>
+                    <input type="text" id="item-name" required>
+                </div>
+                <div id="process-specific-fields" style="display:none;">
+                    <div class="form-group">
+                        <label>Systems:</label>
+                        <div id="systems-checkboxes" class="checkbox-group"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Vendors:</label>
+                        <div id="vendors-checkboxes" class="checkbox-group"></div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" id="save-item">Save</button>
+                    <button type="button" id="delete-item" style="display:none;">Delete</button>
+                </div>
+            </form>
         </div>
-      </form>
     </div>
-  </div>
 
-  <footer>
-    <small>© 2025 Business Process Visualization</small>
-  </footer>
-  <script src="admin.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
