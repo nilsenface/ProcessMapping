@@ -1353,21 +1353,135 @@ function updateVisualization(id, type) {
 }
 
 // Fallback to force-directed layout if tree layout fails
-function createForceDirectedLayout(g, nodes, links) {
-    // Create a simulation
+// Replace the createForceDirectedLayout function in app.js with this improved version:
+
+function createForceDirectedLayout(g, focusId, focusType, width, height) {
+    console.log("Creating hierarchical layout");
+    
+    // Prepare data based on focus
+    let nodes = [];
+    let links = [];
+    
+    // Determine which processes to include
+    let processesToInclude = [];
+    if (focusId && focusType === 'process') {
+        processesToInclude = [data.processes.find(p => p.id === focusId)];
+    } else if (focusId && focusType === 'system') {
+        processesToInclude = data.processes.filter(p => p.systems.includes(focusId));
+    } else if (focusId && focusType === 'vendor') {
+        processesToInclude = data.processes.filter(p => p.vendors.includes(focusId));
+    } else {
+        processesToInclude = data.processes;
+    }
+    
+    console.log("Processes to include:", processesToInclude.length);
+    
+    // Add processes to nodes
+    processesToInclude.forEach((process, index) => {
+        if (!process) return; // Skip if process is undefined
+        
+        // Position processes in a row at the top
+        const processX = width * (index + 1) / (processesToInclude.length + 1);
+        const processY = 100;
+        
+        nodes.push({
+            id: process.id,
+            name: process.name,
+            type: 'process',
+            level: 1,
+            x: processX,
+            y: processY,
+            fx: processX, // Fixed X position
+            fy: processY  // Fixed Y position
+        });
+        
+        // Add systems for this process
+        const systemsForProcess = process.systems.map(sId => data.systems.find(s => s.id === sId)).filter(s => s);
+        
+        systemsForProcess.forEach((system, sysIndex) => {
+            // Check if system already exists in nodes
+            let existingSystem = nodes.find(node => node.id === system.id);
+            
+            if (!existingSystem) {
+                // Position systems in the middle row
+                const systemX = processX - 100 + (sysIndex * 200 / systemsForProcess.length);
+                const systemY = 250;
+                
+                existingSystem = {
+                    id: system.id,
+                    name: system.name,
+                    type: 'system',
+                    level: 2,
+                    x: systemX,
+                    y: systemY
+                };
+                
+                nodes.push(existingSystem);
+            }
+            
+            // Add link from process to system
+            links.push({
+                source: process.id,
+                target: system.id
+            });
+            
+            // Add vendors for this process
+            const vendorsForProcess = process.vendors.map(vId => data.vendors.find(v => v.id === vId)).filter(v => v);
+            
+            vendorsForProcess.forEach((vendor, vendorIndex) => {
+                // Check if vendor already exists in nodes
+                let existingVendor = nodes.find(node => node.id === vendor.id);
+                
+                if (!existingVendor) {
+                    // Position vendors at the bottom
+                    const vendorX = existingSystem.x - 50 + (vendorIndex * 100 / vendorsForProcess.length);
+                    const vendorY = 400;
+                    
+                    existingVendor = {
+                        id: vendor.id,
+                        name: vendor.name,
+                        type: 'vendor',
+                        level: 3,
+                        x: vendorX,
+                        y: vendorY
+                    };
+                    
+                    nodes.push(existingVendor);
+                }
+                
+                // Add link from system to vendor
+                links.push({
+                    source: system.id,
+                    target: vendor.id
+                });
+            });
+        });
+    });
+    
+    console.log("Nodes:", nodes.length, "Links:", links.length);
+    
+    if (nodes.length === 0) {
+        console.log("No nodes to display");
+        return;
+    }
+    
+    // Create a simulation with very weak forces (mostly for fine adjustments)
     const simulation = d3.forceSimulation(nodes)
-        .force("link", d3.forceLink(links).id(d => d.id).distance(150))
-        .force("charge", d3.forceManyBody().strength(-500))
-        .force("center", d3.forceCenter(0, 0))
-        .force("x", d3.forceX().strength(0.1))
-        .force("y", d3.forceY().strength(0.1));
+        .force("link", d3.forceLink(links).id(d => d.id).distance(100))
+        .force("charge", d3.forceManyBody().strength(-50)) // Weak repulsion
+        .force("x", d3.forceX().x(d => d.x).strength(0.5)) // Strong pull to initial x
+        .force("y", d3.forceY().y(d => d.y).strength(0.5)) // Strong pull to initial y
+        .force("collide", d3.forceCollide().radius(60)); // Prevent overlap
     
     // Create links
     const link = g.selectAll(".link")
         .data(links)
         .enter()
-        .append("line")
-        .attr("class", "link");
+        .append("path") // Use paths instead of lines for curved links
+        .attr("class", "link")
+        .attr("stroke", "#aaa")
+        .attr("stroke-width", 1.5)
+        .attr("fill", "none");
     
     // Create nodes
     const node = g.selectAll(".node")
@@ -1381,7 +1495,7 @@ function createForceDirectedLayout(g, nodes, links) {
             .on("end", dragended))
         .on("click", function(event, d) {
             event.stopPropagation();
-            handleNodeClick(event, { data: d });
+            handleNodeClick(event, d);
         });
     
     // Create node shapes
@@ -1423,13 +1537,16 @@ function createForceDirectedLayout(g, nodes, links) {
             .text(d.name);
     });
     
-    // Update positions on tick
+    // Update positions on tick - use curved links
     simulation.on("tick", () => {
-        link
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
+        link.attr("d", d => {
+            // Create curved paths
+            const dx = d.target.x - d.source.x,
+                  dy = d.target.y - d.source.y,
+                  dr = Math.sqrt(dx * dx + dy * dy) * 2; // Curve radius
+            
+            return `M${d.source.x},${d.source.y}A${dr},${dr} 0 0,1 ${d.target.x},${d.target.y}`;
+        });
         
         node.attr("transform", d => `translate(${d.x},${d.y})`);
     });
@@ -1448,8 +1565,11 @@ function createForceDirectedLayout(g, nodes, links) {
     
     function dragended(event, d) {
         if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+        // Only keep fixed positions for processes
+        if (d.type !== 'process') {
+            d.fx = null;
+            d.fy = null;
+        }
     }
 }
 
