@@ -826,3 +826,95 @@ function createGraphData(id = null, type = null) {
     
     return { nodes, links };
 }
+// Add a detail box element dynamically to the visualization container
+const detailBox = document.createElement('div');
+detailBox.id = 'detail-box';
+detailBox.style.position = 'absolute';
+detailBox.style.top = '20px';
+detailBox.style.right = '20px';
+detailBox.style.backgroundColor = 'white';
+detailBox.style.border = '1px solid #ccc';
+detailBox.style.borderRadius = '8px';
+detailBox.style.padding = '15px';
+detailBox.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+detailBox.style.maxWidth = '300px';
+detailBox.style.zIndex = '1000';
+detailBox.style.display = 'none';
+detailBox.style.overflowY = 'auto';
+detailBox.style.maxHeight = '400px';
+detailBox.style.fontFamily = 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
+detailBox.style.fontSize = '14px';
+detailBox.style.color = '#333';
+
+// Append detail box to visualization container
+const visualizationContainer = document.getElementById('visualization');
+visualizationContainer.style.position = 'relative';
+visualizationContainer.appendChild(detailBox);
+
+// Function to show detail box for a process or system
+function showDetailBox(itemId, itemType) {
+    let html = '';
+    if (itemType === 'process') {
+        const process = data.processes.find(p => p.id === itemId);
+        if (!process) return;
+        html += `<h3>Process: ${process.name}</h3>`;
+        html += '<strong>Systems:</strong><ul>';
+        process.systems.forEach(sysId => {
+            const sys = data.systems.find(s => s.id === sysId);
+            if (sys) html += `<li>${sys.name}</li>`;
+        });
+        html += '</ul>';
+        html += '<strong>Vendors:</strong><ul>';
+        process.vendors.forEach(vId => {
+            const vendor = data.vendors.find(v => v.id === vId);
+            if (vendor) html += `<li>${vendor.name}</li>`;
+        });
+        html += '</ul>';
+    } else if (itemType === 'system') {
+        const system = data.systems.find(s => s.id === itemId);
+        if (!system) return;
+        html += `<h3>System: ${system.name}</h3>`;
+        // Find processes linked to this system
+        const linkedProcesses = data.processes.filter(p => p.systems.includes(itemId));
+        html += '<strong>Processes:</strong><ul>';
+        linkedProcesses.forEach(proc => {
+            html += `<li>${proc.name}</li>`;
+        });
+        html += '</ul>';
+        // Find vendors linked to these processes
+        let linkedVendorsSet = new Set();
+        linkedProcesses.forEach(proc => {
+            proc.vendors.forEach(vId => linkedVendorsSet.add(vId));
+        });
+        html += '<strong>Vendors:</strong><ul>';
+        linkedVendorsSet.forEach(vId => {
+            const vendor = data.vendors.find(v => v.id === vId);
+            if (vendor) html += `<li>${vendor.name}</li>`;
+        });
+        html += '</ul>';
+    } else {
+        // Hide detail box for other types
+        detailBox.style.display = 'none';
+        return;
+    }
+    detailBox.innerHTML = html;
+    detailBox.style.display = 'block';
+}
+
+// Modify selectItem function to show detail box when clicking process or system
+const originalSelectItem = selectItem;
+selectItem = function(id, type) {
+    originalSelectItem(id, type);
+    if (type === 'process' || type === 'system') {
+        showDetailBox(id, type);
+    } else {
+        detailBox.style.display = 'none';
+    }
+};
+
+// Hide detail box when clicking outside items
+window.addEventListener('click', function(event) {
+    if (!event.target.closest('.item') && !event.target.closest('#detail-box')) {
+        detailBox.style.display = 'none';
+    }
+});
