@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../config.php';
 
 /**
- * Get all data from the database.
+ * Get all data from the database..
  * @return array The complete data structure
  */
 function getAllData() {
